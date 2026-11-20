@@ -1,0 +1,38 @@
+{
+  "schema": "architectural-philosophy-proposal/0.1",
+  "title": "Optional compiled fast parser (rowfold[fast])",
+  "summary": "Add an optional compiled parser, installed with \"pip install rowfold[fast]\", with the pure-Python parser as the fallback, and test both for identical output. (Example package.)",
+  "bluf": "Add an optional compiled parser, installed with \"pip install rowfold[fast]\"; rowfold uses it when present and falls back to the pure-Python parser otherwise, and one shared test suite checks that both give identical output. This is the case the philosophy already welcomes, compiled code as an optional extra with an identical-results fallback, so plain installs and correctness are untouched. Decision needed: approve the optional [fast] extra?",
+  "overall": "consistent",
+  "philosophy_version": "1.1.1",
+  "touched": [
+    {
+      "id": "T02",
+      "rev": 2,
+      "position": 0.2,
+      "verdict": "flip_condition_met",
+      "flip_condition": "Compiled code is welcome as an optional extra with a pure-Python fallback that gives identical results.",
+      "reason": "The compiled parser is opt-in, the pure-Python parser stays the default and the reference, and the shared test suite checks identical results on every release."
+    },
+    {
+      "id": "T04",
+      "rev": 1,
+      "weights": {
+        "Approachability": 0.3,
+        "Performance": 0.25,
+        "Correctness": 0.45
+      },
+      "verdict": "consistent",
+      "reason": "Correctness stays protected first: both parsers must produce identical output on the full test corpus before any release."
+    },
+    {
+      "id": "T03",
+      "rev": 1,
+      "position": -0.6,
+      "verdict": "consistent",
+      "reason": "The compiled code ships as an extra, so the core install gains no dependency."
+    }
+  ],
+  "hard_limits_at_risk": [],
+  "decision_needed": "Approve the optional [fast] extra?"
+}

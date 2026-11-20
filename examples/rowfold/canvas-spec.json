@@ -1,0 +1,131 @@
+{
+  "schema": "architectural-philosophy-canvas/0.1",
+  "id": "rowfold-demo-2026-11-20",
+  "title": "rowfold (example package): where do you stand?",
+  "project": "rowfold (example package)",
+  "intro": "Four short questions about how rowfold, an example package, should trade one good thing against another. Answer from how the project actually behaves, not how you wish it did.",
+  "respondent": "",
+  "glossary": [
+    {
+      "id": "portability",
+      "name": "Portability",
+      "rev": 1,
+      "definition": "The range of Python versions, operating systems, CPU architectures and runtimes on which rowfold installs and gives the same results without extra tools."
+    },
+    {
+      "id": "performance",
+      "name": "Performance",
+      "rev": 1,
+      "definition": "How quickly, and within how little memory, rowfold reads and transforms large files on a single machine."
+    },
+    {
+      "id": "approachability",
+      "name": "Approachability",
+      "rev": 1,
+      "definition": "How quickly someone new to rowfold gets a correct first result from the documentation, without help."
+    },
+    {
+      "id": "correctness",
+      "name": "Correctness",
+      "rev": 1,
+      "definition": "The degree to which every table rowfold returns matches what the file actually holds, or rowfold raises a clear error instead of returning a guess."
+    },
+    {
+      "id": "compatibility",
+      "name": "Compatibility",
+      "rev": 1,
+      "definition": "The degree to which code written against an earlier rowfold release keeps working, unchanged, on the latest one."
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "rev": 1,
+      "definition": "How easily a reader can predict what an API call does from its name, arguments and type hints alone."
+    }
+  ],
+  "widgets": [
+    {
+      "id": "w1",
+      "kind": "spectrum",
+      "tension_id": "T02",
+      "prompt": "When rowfold could be faster with compiled code, where should it sit between portability and raw speed?",
+      "poles": [
+        {
+          "value": "Portability",
+          "ref": "portability"
+        },
+        {
+          "value": "Performance",
+          "ref": "performance"
+        }
+      ],
+      "steps": 7
+    },
+    {
+      "id": "w2",
+      "kind": "triangle",
+      "tension_id": "T04",
+      "prompt": "If rowfold can only protect two of these fully, how would you weight all three?",
+      "values": [
+        {
+          "value": "Approachability",
+          "ref": "approachability"
+        },
+        {
+          "value": "Performance",
+          "ref": "performance"
+        },
+        {
+          "value": "Correctness",
+          "ref": "correctness"
+        }
+      ]
+    },
+    {
+      "id": "w3",
+      "kind": "dilemma",
+      "tension_id": "T01",
+      "prompt": "A confusing argument",
+      "scenario": "The skip argument of read() skips rows, but many users expect it to skip columns. About forty downstream packages pass skip= today.",
+      "options": [
+        {
+          "id": "a",
+          "label": "Add a clearer skip_rows and deprecate skip",
+          "detail": "skip keeps working with a warning for two minor releases, then goes away in the next major release.",
+          "leans_toward": "Clarity"
+        },
+        {
+          "id": "b",
+          "label": "Keep skip and fix the documentation",
+          "detail": "No downstream code changes; the name stays confusing for new users.",
+          "leans_toward": "Compatibility"
+        }
+      ],
+      "values": [
+        {
+          "value": "Compatibility",
+          "ref": "compatibility"
+        },
+        {
+          "value": "Clarity",
+          "ref": "clarity"
+        }
+      ],
+      "flip_prompt": "What would make you pick the other option?"
+    },
+    {
+      "id": "w4",
+      "kind": "define",
+      "prompt": "What does Correctness mean in rowfold?",
+      "value": {
+        "value": "Correctness",
+        "ref": "correctness"
+      },
+      "neighbor": {
+        "value": "Performance",
+        "ref": "performance"
+      },
+      "firmness": false
+    }
+  ]
+}

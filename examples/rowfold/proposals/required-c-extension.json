@@ -1,0 +1,35 @@
+{
+  "schema": "architectural-philosophy-proposal/0.1",
+  "title": "Rewrite the core parser as a required C extension",
+  "summary": "A contributor's agent proposes rewriting rowfold's core parser in C, as a required compiled extension, for about ten times the speed on large files. (Example package.)",
+  "bluf": "A contributor's agent proposes replacing rowfold's pure-Python parser with a required C extension for about ten times the speed. The speed is welcome, but making compiled code mandatory goes against the portability-first stance and breaks the promise that installing rowfold never needs a compiler. Decision needed: ask the contributor to reshape it as an optional extra with a pure-Python fallback?",
+  "overall": "needs_decision",
+  "philosophy_version": "1.1.1",
+  "touched": [
+    {
+      "id": "T02",
+      "rev": 2,
+      "position": 0.8,
+      "verdict": "departs",
+      "reason": "Compiled code becomes required and the pure-Python parser is removed; the flip condition welcomes compiled code only as an optional extra with a pure-Python fallback, so it does not apply."
+    },
+    {
+      "id": "T04",
+      "rev": 1,
+      "weights": {
+        "Approachability": 0.15,
+        "Performance": 0.55,
+        "Correctness": 0.3
+      },
+      "verdict": "departs",
+      "reason": "With the reference parser gone, nothing independent checks the new C parser's output, so performance gains weight at correctness's expense."
+    }
+  ],
+  "hard_limits_at_risk": [
+    {
+      "id": "H1",
+      "reason": "Platforms without a prebuilt wheel (a new Python release, musl or Alpine, Pyodide, less common CPUs) would need a C compiler to install rowfold."
+    }
+  ],
+  "decision_needed": "Ask the contributor to reshape it as an optional extra with a pure-Python fallback?"
+}

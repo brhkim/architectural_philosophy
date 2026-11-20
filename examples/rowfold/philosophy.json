@@ -1,0 +1,548 @@
+{
+  "schema": "architectural-philosophy/0.1-draft",
+  "project": "rowfold (example package)",
+  "version": "1.1.1",
+  "status_note": "EXAMPLE PACKAGE. rowfold is fictional, invented for the architectural-philosophy demo on 2026-11-20 (the name was unregistered on PyPI that day). Its maintainers, releases, dates and quotes are illustrative, not a real project's record.",
+  "mission": "Example package: rowfold is a small, pure-Python library for reading and transforming tabular files (CSV, TSV and fixed-width), and many downstream projects depend on it.",
+  "project_types": [
+    "library"
+  ],
+  "ratified": "2026-06-02",
+  "last_amended": "2026-09-14",
+  "synthesis": {
+    "text": "Example package: rowfold is a library other projects build on, so it protects the people downstream first: installing it never needs a compiler, and nothing is removed without a deprecation period. Correct results come before speed and before convenience; when rowfold cannot be sure what a file means, it says so instead of guessing. Portability comes before raw speed, and compiled code is welcome only as an optional extra that gives the same results as the pure-Python path. The core stays small, and integrations with other tools live in plugins. When an old API is unclear, the project keeps it working and adds a clearer one beside it, saving clean breaks for major releases with a migration guide.",
+    "as_of_version": "1.1.1"
+  },
+  "maintainers": [
+    {
+      "handle": "maintainer-a",
+      "role": "lead maintainer (fictional)"
+    },
+    {
+      "handle": "maintainer-b",
+      "role": "co-maintainer, owns the parser (fictional)"
+    }
+  ],
+  "strictness": {
+    "level": "advisory",
+    "by_firmness": {
+      "core": "flag-and-ask"
+    },
+    "note": "Advisory overall; a departure from a core stance stops and asks."
+  },
+  "hard_limits": [
+    {
+      "id": "H1",
+      "text": "pip install works everywhere we support, with no compiler required: installing rowfold succeeds on every supported Python version and platform from a pure-Python wheel.",
+      "source": "Example: the project README's install promise",
+      "kind": "floor",
+      "protects": [
+        "Portability"
+      ]
+    },
+    {
+      "id": "H2",
+      "text": "No breaking change to the public API without a deprecation period: the old behaviour keeps working, with a warning, for at least two minor releases before it is removed.",
+      "source": "Example: the project's versioning policy",
+      "kind": "prohibition",
+      "protects": [
+        "Compatibility"
+      ]
+    },
+    {
+      "id": "H3",
+      "text": "The public API stays fully typed: every public function, class and argument ships with type annotations that pass a strict type checker.",
+      "source": "Example: the project's contributing guide",
+      "kind": "floor",
+      "protects": [
+        "Explicitness"
+      ]
+    }
+  ],
+  "glossary_terms": [
+    {
+      "id": "public-api",
+      "name": "public API",
+      "rev": 1,
+      "definition": "Every name importable from rowfold without a leading underscore, plus the documented arguments and return types of those names."
+    },
+    {
+      "id": "identical-results",
+      "name": "identical results",
+      "rev": 1,
+      "definition": "Byte-for-byte equal output tables, including column types, missing-value markers and error messages, on the project's full test corpus of files."
+    }
+  ],
+  "tensions": [
+    {
+      "id": "T01",
+      "rev": 1,
+      "slug": "compatibility-vs-clarity",
+      "kind": "polarity",
+      "name": "Backward compatibility vs. API clarity",
+      "poles": [
+        {
+          "value": "Compatibility",
+          "ref": "compatibility",
+          "good": "Downstream code keeps working after every upgrade, so thousands of projects can update without reading release notes.",
+          "overdone": "Confusing old names and arguments live forever; every new user pays for a mistake made years ago."
+        },
+        {
+          "value": "Clarity",
+          "ref": "clarity",
+          "good": "The API reads the way it works; one obvious way to do each thing.",
+          "overdone": "Constant renames; downstream maintainers spend their weekends chasing the library."
+        }
+      ],
+      "stance": {
+        "position": -0.6,
+        "summary": "Compatibility over clarity. A clearer API is added beside the old one, and the old one leaves only through deprecation.",
+        "firmness": "core"
+      },
+      "flip_conditions": [
+        "A major release may remove an unclear API for clarity's sake when it ships with a published migration guide."
+      ],
+      "precedents": [
+        {
+          "title": "v2.0 kept the old read() signature for two releases",
+          "note": "The clearer keyword-only read(path, *, schema=...) shipped beside the old positional form, which warned through 2.1 and 2.2 and was removed in 3.0 with a migration guide."
+        }
+      ],
+      "positions": [
+        {
+          "holder": "maintainer-a",
+          "position": -0.6,
+          "endorsement": "endorse"
+        },
+        {
+          "holder": "maintainer-b",
+          "position": -0.1,
+          "endorsement": "consent with concern",
+          "note": "Example: keeping old signatures around slows down new contributors and makes the docs harder to follow."
+        }
+      ],
+      "status": "consented"
+    },
+    {
+      "id": "T02",
+      "rev": 2,
+      "slug": "portability-vs-performance",
+      "kind": "polarity",
+      "name": "Portability vs. raw speed",
+      "poles": [
+        {
+          "value": "Portability",
+          "ref": "portability",
+          "good": "Runs anywhere Python runs: new Python releases on day one, Alpine, Pyodide, unusual CPUs, locked-down machines.",
+          "overdone": "Users with large files leave for faster libraries, and the project refuses help that would cost nothing to anyone else."
+        },
+        {
+          "value": "Performance",
+          "ref": "performance",
+          "good": "Large files parse in seconds, not minutes, so rowfold stays usable as data grows.",
+          "overdone": "A build matrix nobody can maintain, and installs that fail on the platforms the project promised to support."
+        }
+      ],
+      "stance": {
+        "position": -0.5,
+        "summary": "Portability first: the pure-Python parser is the reference. Compiled extras are welcome when optional.",
+        "firmness": "firm"
+      },
+      "flip_conditions": [
+        "Compiled code is welcome as an optional extra with a pure-Python fallback that gives identical results."
+      ],
+      "precedents": [
+        {
+          "title": "Optional [zstd] compression extra (v2.3)",
+          "note": "Zstandard support came through a compiled library as an opt-in extra; gzip and bz2 from the standard library keep working without it."
+        }
+      ],
+      "status": "agreed",
+      "amendments": [
+        {
+          "rev": 2,
+          "date": "2026-09-14",
+          "summary": "After three optional compiled extras shipped without problems, the flip condition was promoted into the stance: compiled extras are welcome when optional. Before: \"Pure Python only; speed comes from better algorithms.\" After: \"Portability first: the pure-Python parser is the reference. Compiled extras are welcome when optional.\""
+        }
+      ]
+    },
+    {
+      "id": "T03",
+      "rev": 1,
+      "slug": "small-core-vs-batteries-included",
+      "kind": "polarity",
+      "name": "Small core vs. batteries included",
+      "poles": [
+        {
+          "value": "Small core",
+          "ref": "small-core",
+          "good": "Few dependencies and a surface two maintainers can actually keep correct.",
+          "overdone": "Every user re-writes the same Excel or Parquet glue code, badly."
+        },
+        {
+          "value": "Batteries included",
+          "ref": "batteries-included",
+          "good": "Common jobs work out of the box with one install.",
+          "overdone": "A heavy dependency tree that every downstream project inherits, for features most never use."
+        }
+      ],
+      "stance": {
+        "position": -0.7,
+        "summary": "Small core. Integrations with other formats and tools live in plugins that depend on rowfold, not the other way round.",
+        "firmness": "firm"
+      },
+      "flip_conditions": [
+        "An integration may move into the core when it needs nothing beyond the standard library and most downstream users already rely on it."
+      ],
+      "precedents": [
+        {
+          "title": "Excel reading moved to the rowfold-excel plugin",
+          "note": "Kept out of the core in v2.2 so the core install did not gain a spreadsheet dependency."
+        }
+      ],
+      "status": "agreed"
+    },
+    {
+      "id": "T04",
+      "rev": 1,
+      "slug": "approachability-performance-correctness",
+      "kind": "triad",
+      "name": "Approachability, performance, correctness",
+      "values": [
+        {
+          "value": "Approachability",
+          "ref": "approachability",
+          "good": "A newcomer reads a file correctly in one line, from the first example in the docs."
+        },
+        {
+          "value": "Performance",
+          "ref": "performance",
+          "good": "Large files parse quickly and within memory."
+        },
+        {
+          "value": "Correctness",
+          "ref": "correctness",
+          "good": "The table you get is the table the file holds, or a clear error that says why not."
+        }
+      ],
+      "rule": "pick-two",
+      "stance": {
+        "weights": {
+          "Approachability": 0.3,
+          "Performance": 0.2,
+          "Correctness": 0.5
+        },
+        "pick": [
+          "Correctness",
+          "Approachability"
+        ],
+        "summary": "Correctness is protected first. Within that floor, approachability edges out performance.",
+        "firmness": "firm"
+      },
+      "flip_conditions": [
+        "A faster code path may become the default only when it passes the same correctness test suite as the path it replaces."
+      ],
+      "precedents": [
+        {
+          "title": "Ambiguous dates raise an error (v2.1)",
+          "note": "01/02/2024 stopped being guessed as January or February; rowfold asks for a format, at a cost in speed and in friction for newcomers."
+        }
+      ],
+      "positions": [
+        {
+          "holder": "maintainer-a",
+          "weights": {
+            "Approachability": 0.3,
+            "Performance": 0.2,
+            "Correctness": 0.5
+          },
+          "endorsement": "endorse"
+        },
+        {
+          "holder": "maintainer-b",
+          "weights": {
+            "Approachability": 0.15,
+            "Performance": 0.35,
+            "Correctness": 0.5
+          },
+          "endorsement": "consent with concern",
+          "note": "Worries that slow defaults send users with large files to faster libraries before they ever see rowfold's guarantees."
+        }
+      ],
+      "status": "consented"
+    },
+    {
+      "id": "T05",
+      "rev": 1,
+      "slug": "explicit-vs-convenient",
+      "kind": "polarity",
+      "name": "Explicit vs. convenient behaviour",
+      "poles": [
+        {
+          "value": "Explicitness",
+          "ref": "explicitness",
+          "good": "What rowfold does is visible in the call: no hidden guesses about encodings, types or delimiters.",
+          "overdone": "Ten keyword arguments to read an ordinary CSV."
+        },
+        {
+          "value": "Convenience",
+          "ref": "convenience",
+          "good": "Sensible guesses make the common case one short line.",
+          "overdone": "Magic that works on the demo file and silently mangles the real one."
+        }
+      ],
+      "stance": {
+        "position": -0.4,
+        "summary": "Lean explicit. Guessing is allowed when the user asks for it, and rowfold always reports what it guessed.",
+        "firmness": "working"
+      },
+      "flip_conditions": [
+        "Interactive helpers (such as rowfold.peek) may guess by default, as long as they print what they guessed."
+      ],
+      "precedents": [
+        {
+          "title": "Encoding detection is opt-in",
+          "note": "encoding=\"auto\" exists but is never the default; the default is UTF-8 with a clear error on failure."
+        }
+      ],
+      "status": "agreed"
+    }
+  ],
+  "amendment_log": [
+    {
+      "version": "1.0.0",
+      "date": "2026-06-02",
+      "summary": "First confirmed philosophy after interviews with both maintainers (illustrative)."
+    },
+    {
+      "version": "1.1.0",
+      "date": "2026-09-14",
+      "summary": "Portability vs. raw speed moved to revision 2 (compiled extras are welcome when optional); synthesis refreshed."
+    },
+    {
+      "version": "1.1.1",
+      "date": "2026-11-20",
+      "summary": "Recorded both maintainers' positions on T01; maintainer-b consents with a concern. No stance changed."
+    }
+  ],
+  "values": [
+    {
+      "id": "compatibility",
+      "name": "Compatibility",
+      "rev": 1,
+      "definition": "The degree to which code written against an earlier rowfold release keeps working, unchanged, on the latest one.",
+      "looks_like": [
+        "Old arguments still accepted, with a DeprecationWarning",
+        "Downstream test suites pass after an upgrade",
+        "Changelog entries that say 'no action needed'"
+      ],
+      "too_little": "Downstream projects pin old versions and stop upgrading.",
+      "not_to_be_confused_with": "Not stability of internals: private modules may change freely. Not Portability, which is about where rowfold runs, not which code still runs.",
+      "in_own_words": "If someone wrote rowfold.read(path, ',') in 2023 and never touched it again, it should still work, or it should have warned them loudly for a long time first. We're a dependency, not an app.",
+      "examples": {
+        "good": [
+          "The 2.0 keyword-only signature shipped beside the positional one"
+        ],
+        "missing_or_faked": [
+          "A 'minor' release that renamed a return column and broke three plugins"
+        ]
+      }
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "rev": 1,
+      "definition": "How easily a reader can predict what an API call does from its name, arguments and type hints alone.",
+      "looks_like": [
+        "Keyword-only arguments with descriptive names",
+        "One obvious way to do each task",
+        "No arguments whose meaning depends on another argument"
+      ],
+      "too_little": "Users read the source to find out what skip=3 skips.",
+      "not_to_be_confused_with": "Not Approachability, which is about a newcomer's first success; a clear API can still take some learning. Not brevity.",
+      "in_own_words": "Clear means you can read a call in someone else's code review and know what it does without opening our docs.",
+      "examples": {
+        "good": [
+          "read(path, *, schema=...) replacing a positional types argument"
+        ],
+        "missing_or_faked": [
+          "A mode string argument with seven undocumented values"
+        ]
+      }
+    },
+    {
+      "id": "portability",
+      "name": "Portability",
+      "rev": 1,
+      "definition": "The range of Python versions, operating systems, CPU architectures and runtimes on which rowfold installs and gives the same results without extra tools.",
+      "looks_like": [
+        "Pure-Python wheel tagged py3-none-any",
+        "CI on Linux, macOS, Windows, musl and Pyodide",
+        "Works on a new Python release the day it ships"
+      ],
+      "too_little": "Install failures on platforms without a prebuilt wheel; 'please install a C compiler' issues.",
+      "not_to_be_confused_with": "Not Compatibility (which old code still runs). Not a ban on compiled code: optional extras do not reduce portability while the pure-Python path stays complete.",
+      "in_own_words": "The test is a fresh Raspberry Pi or a browser tab running Pyodide. If pip install rowfold works there and gives the same answers, we're portable.",
+      "examples": {
+        "good": [
+          "Day-one support for a new CPython release with no rebuild"
+        ],
+        "missing_or_faked": [
+          "'Supports all platforms' on the README while the Alpine wheel is missing"
+        ]
+      }
+    },
+    {
+      "id": "performance",
+      "name": "Performance",
+      "rev": 1,
+      "definition": "How quickly, and within how little memory, rowfold reads and transforms large files on a single machine.",
+      "looks_like": [
+        "Rows per second on the benchmark corpus",
+        "Peak memory on a 1 GB file",
+        "Streaming reads that never load the whole file"
+      ],
+      "too_little": "Users with large files switch libraries or write their own parser.",
+      "not_to_be_confused_with": "Not Correctness: a fast wrong answer is not performance. Not Approachability: a fast API can still be hard to use.",
+      "in_own_words": "Performance is the 2 GB log file someone actually has. Microbenchmarks on ten rows don't count.",
+      "examples": {
+        "good": [
+          "Streaming read_chunks() that kept memory flat on multi-gigabyte files"
+        ],
+        "missing_or_faked": [
+          "A benchmark chart that only measured files that fit in the CPU cache"
+        ]
+      }
+    },
+    {
+      "id": "small-core",
+      "name": "Small core",
+      "rev": 1,
+      "definition": "How few features, dependencies and lines of code the core rowfold package carries.",
+      "looks_like": [
+        "Zero runtime dependencies beyond the standard library",
+        "New formats arrive as plugins",
+        "Issues closed with 'this belongs in a plugin'"
+      ],
+      "too_little": "The core gains dependencies that every downstream project must install and audit.",
+      "not_to_be_confused_with": "Not minimal usefulness: the core still does its one job completely. Not Clarity.",
+      "in_own_words": "Two of us maintain this. Everything in the core is something we promise to keep correct forever, so the core holds only what we can keep that promise for.",
+      "examples": {
+        "good": [
+          "Excel support shipped as rowfold-excel"
+        ],
+        "missing_or_faked": [
+          "A 'tiny' helper that pulled in a 40 MB dependency"
+        ]
+      }
+    },
+    {
+      "id": "batteries-included",
+      "name": "Batteries included",
+      "rev": 1,
+      "definition": "How many common tabular jobs a user can do with the core install alone, without finding and installing anything else.",
+      "looks_like": [
+        "Built-in readers for the formats users ask about most",
+        "Recipes in the docs that need no extra install"
+      ],
+      "too_little": "Every user hunts for plugins and writes the same glue code.",
+      "not_to_be_confused_with": "Not Approachability, which is about how easy a feature is to use once present; this is whether it is present at all.",
+      "in_own_words": "The person who just wants to turn a TSV into JSON on a locked-down work laptop shouldn't need three packages.",
+      "examples": {
+        "good": [
+          "JSON Lines output in the core, since it needs only the standard library"
+        ],
+        "missing_or_faked": [
+          "A 'built-in' feature that fails with ImportError until you install an extra"
+        ]
+      }
+    },
+    {
+      "id": "approachability",
+      "name": "Approachability",
+      "rev": 1,
+      "definition": "How quickly someone new to rowfold gets a correct first result from the documentation, without help.",
+      "looks_like": [
+        "The first docs example works unchanged",
+        "Error messages that say what to type next",
+        "Defaults that fit the common case"
+      ],
+      "too_little": "New users give up at the first error and pick another library.",
+      "not_to_be_confused_with": "Not Convenience (guessing on the user's behalf) and not Clarity (predictability for an experienced reader).",
+      "in_own_words": "Approachable means a grad student with a CSV and fifteen minutes gets the right table, and if something is wrong, the error tells them exactly what to change.",
+      "examples": {
+        "good": [
+          "The date error that prints the two possible readings and the argument to choose one"
+        ],
+        "missing_or_faked": [
+          "A quickstart that only works on the bundled sample file"
+        ]
+      }
+    },
+    {
+      "id": "correctness",
+      "name": "Correctness",
+      "rev": 1,
+      "definition": "The degree to which every table rowfold returns matches what the file actually holds, or rowfold raises a clear error instead of returning a guess.",
+      "looks_like": [
+        "Round-trip tests on a corpus of real, messy files",
+        "Errors on ambiguous input instead of silent choices",
+        "Property-based tests on the parser"
+      ],
+      "too_little": "Silent data corruption: shifted columns, dropped rows, misread dates.",
+      "not_to_be_confused_with": "Not test coverage: many tests can check the wrong thing. Not Explicitness, though explicit arguments help. Not Performance: a faster path must be exactly as correct.",
+      "in_own_words": "Correct means I'd bet a downstream researcher's paper on the table. If we're not sure what a cell means, we stop and say so; we never return a plausible guess.",
+      "examples": {
+        "good": [
+          "The ambiguous-date error added in v2.1"
+        ],
+        "missing_or_faked": [
+          "A 95% coverage badge on a parser that still drops the last row without a trailing newline"
+        ]
+      }
+    },
+    {
+      "id": "explicitness",
+      "name": "Explicitness",
+      "rev": 1,
+      "definition": "The degree to which every choice rowfold makes about a file (encoding, delimiter, types) is either stated by the caller or reported back to them.",
+      "looks_like": [
+        "Full type hints on the public API",
+        "Guesses returned in a report object",
+        "No behaviour that depends on global state"
+      ],
+      "too_little": "The same call gives different tables on two machines and nobody can tell why.",
+      "not_to_be_confused_with": "Not verbosity: a short call can be explicit if its defaults are documented and fixed. Not Clarity, which is about naming.",
+      "in_own_words": "I don't mind defaults. I mind defaults that change based on what's in the file and don't tell you.",
+      "examples": {
+        "good": [
+          "peek() printing 'guessed delimiter: tab'"
+        ],
+        "missing_or_faked": [
+          "A locale-dependent number parser enabled by default"
+        ]
+      }
+    },
+    {
+      "id": "convenience",
+      "name": "Convenience",
+      "rev": 1,
+      "definition": "How few arguments and steps the common case takes, because rowfold infers sensible settings for the user.",
+      "looks_like": [
+        "One-line reads for ordinary files",
+        "Delimiter and header detection on request"
+      ],
+      "too_little": "Ordinary jobs need a page of boilerplate.",
+      "not_to_be_confused_with": "Not Approachability, which can also come from good errors and docs. Not silent guessing: convenience here always reports what it inferred.",
+      "in_own_words": "Most files are boring. If the file is a plain comma CSV with a header, the user shouldn't have to tell us that.",
+      "examples": {
+        "good": [
+          "rowfold.peek('data.csv') for a first look"
+        ],
+        "missing_or_faked": [
+          "Auto-detection that worked on every demo and failed on the first semicolon-separated file"
+        ]
+      }
+    }
+  ]
+}
