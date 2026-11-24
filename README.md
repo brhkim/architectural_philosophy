@@ -2,6 +2,12 @@
 
 **Your vision and judgment, carried through every step.**
 
+
+
+https://github.com/user-attachments/assets/b0e657b3-283b-483b-bd99-f5e42c77e6ed
+
+
+
 Help your AI assistants work in line with your vision, core principles, priorities, expertise, taste, and judgment—at every step of a project.
 
 Whether you are building software, running research, making a game, working with data, or writing—alone, on a team, or in open source—a big project is full of hard decisions between good things. AI assistants move fast, so suggestions and edits pile up quickly, and you end up repeating the same directions and judgment on every change.
