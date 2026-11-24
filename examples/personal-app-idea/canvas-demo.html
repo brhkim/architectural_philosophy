@@ -1,0 +1,765 @@
+<!doctype html>
+<!--
+  §§ HEADER_DOC
+  canvas.html: interactive elicitation canvas for the "philosophical-alignment" skill.
+  Zero dependencies: one file, vanilla JavaScript, inline SVG and CSS. Works from file://.
+
+  HOW THE SPEC GETS IN
+    scripts/canvas_server.py (or an agent by hand) replaces the contents of the JSON
+    script block with id "canvas-spec" near the end of this file.
+
+  CANVAS SPEC (schema "philosophical-alignment-canvas/0.1"; specs labelled with the skill's earlier
+  name, "architectural-philosophy-canvas/0.1", work unchanged: the page does not depend on the label)
+    { "schema", "id", "title", "project", "intro", "respondent" (optional),
+      "glossary": [ {id, name, rev, definition} ],          // definitions for every value used
+      "widgets": [ ... ] }
+    A value anywhere below is a string or { "value", "ref", "definition", "good" }.
+    Its definition comes from the value itself, else glossary[ref], else glossary by name.
+    Widget kinds (all take id, prompt, optional tension_id, optional firmness:false):
+      spectrum  { poles: [v, v], steps: 5|7 (default 7), randomize_sides: false }
+                No handle until the respondent clicks; separate "It depends" and "Don't know".
+      triangle  { values: [v, v, v], randomize: true }      click or drag, snaps to 10%.
+      allocate  { values: [v...], total: 100, step: 5, randomize: true }
+      rank      { values: [v...], randomize: true, line_label }   drag or buttons, plus a
+                draggable divider: items above it are "never traded away".
+      dilemma   { scenario, options: [{id, label, detail}], randomize: true }
+      define    { value: v, neighbor: v }   the respondent explains a value in their own words.
+
+  RESULT (schema "philosophical-alignment-canvas-result/0.1")
+    { schema, canvas_id, canvas_title, project, respondent, submitted_at, via,
+      results: [ { widget, kind, tension_id, result, initial_state, adjustments,
+                   seconds_spent, answered, firmness, reason, note,
+                   definition_feedback: [{ref, value, shown_definition, rev, suggested}],
+                   presentation_order, respondent, timestamp } ] }
+    Layout (kept visually calm): one disclosure per question for definition feedback ("A meaning
+    here is not what I mean") and one for the note ("Add a note"); definitions stay inline.
+    Submission: POST to the helper server when served by it (a ?t=TOKEN in the URL and a
+    successful same-origin GET /ping), else
+    "Copy answers" (with a visible text box fallback) or "Download answers".
+    Sandboxed hosts (claude.ai Artifacts, iframes): no network request is ever made
+    unless the page was served over http(s) with a ?t= token; no localStorage is used;
+    clipboard and downloads may be blocked, so both always fill the visible text box first.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Philosophy Canvas</title>
+<style>
+/* §§ TOKENS: one family, four sizes, one accent, for a calm page; monospace only for the answers JSON */
+:root {
+  --bg: #f7f6f2; --surface: #ffffff; --surface-2: #f1efe9;
+  --ink: #1d2127; --ink-2: #565c66; --line: #dfdcd4;
+  --accent: #23569b; --on-accent: #ffffff;
+  --ok: #2c6a45; --warn: #8a5800; --bad: #b02a22;
+  --font: "Avenir Next", "Segoe UI Variable Text", "Segoe UI", Ubuntu, "DM Sans", "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  --fs-s: 0.875rem; --fs-m: 1rem; --fs-l: 1.25rem; --fs-xl: clamp(1.8rem, 5vw, 2.4rem);
+  --radius: 10px; --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15171b; --surface: #1c1f24; --surface-2: #23262c; --ink: #e9e7e2; --ink-2: #a9adb5; --line: #363a43;
+    --accent: #8fb5ff; --on-accent: #10141b; --ok: #7cc89a; --warn: #e6b85c; --bad: #ff8f85; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15171b; --surface: #1c1f24; --surface-2: #23262c; --ink: #e9e7e2; --ink-2: #a9adb5; --line: #363a43;
+  --accent: #8fb5ff; --on-accent: #10141b; --ok: #7cc89a; --warn: #e6b85c; --bad: #ff8f85; color-scheme: dark;
+}
+
+/* §§ BASE */
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; color: var(--ink); font: 400 var(--fs-m)/1.6 var(--font); background: var(--bg); overflow-x: hidden; }
+::selection { background: color-mix(in srgb, var(--accent) 25%, transparent); }
+.wrap { max-width: 46rem; margin: 0 auto; padding: 2.5rem 1rem 9rem; }
+h1, h2, h3 { line-height: 1.25; margin: 0; font-weight: 600; text-wrap: balance; }
+h1 { font-size: var(--fs-xl); letter-spacing: -0.015em; }
+h2 { font-size: var(--fs-l); }
+p { margin: 0.35rem 0; }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 0.35rem 0.9rem; min-height: 2.5rem; }
+button:hover { border-color: var(--ink-2); }
+button.primary, button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 600; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+textarea, input[type=text], input[type=number] { width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 0.45rem 0.6rem; }
+textarea { min-height: 3.2rem; resize: vertical; }
+label { display: block; }
+.muted { color: var(--ink-2); }
+.small { font-size: var(--fs-s); }
+.err { color: var(--bad); font-weight: 600; }
+.intro { font-size: var(--fs-l); color: var(--ink-2); margin-top: 0.6rem; line-height: 1.45; }
+.who { margin-top: 1.4rem; max-width: 20rem; }
+.sub { font-size: var(--fs-s); font-weight: 600; margin: 0; }
+
+/* §§ WIDGET_CARD */
+.w { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.3rem 1.3rem 1.1rem; margin-top: 1.5rem; min-width: 0; }
+.w.has-error { border-color: var(--bad); }
+.w-prompt { display: flex; gap: 0.75rem; align-items: baseline; }
+.w-num { flex: none; display: inline-grid; place-items: center; width: 1.7rem; height: 1.7rem; border-radius: 50%; border: 1.5px solid var(--line); font-size: var(--fs-s); color: var(--ink-2); transform: translateY(-0.1rem); transition: background 0.2s var(--ease); }
+.w.done .w-num { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.w-body { margin-top: 0.4rem; }
+.w-foot { margin-top: 1.1rem; border-top: 1px solid var(--line); padding-top: 0.9rem; display: grid; gap: 0.6rem; }
+.seg { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
+.seg .lbl { margin-right: 0.3rem; font-size: var(--fs-s); color: var(--ink-2); }
+.seg button { min-height: 2.25rem; padding: 0.2rem 0.75rem; font-size: var(--fs-s); }
+.w-error { color: var(--bad); font-weight: 600; font-size: var(--fs-s); margin: 0; }
+.w-error:empty { display: none; }
+details.quiet > summary { cursor: pointer; color: var(--ink-2); font-size: var(--fs-s); width: max-content; max-width: 100%; }
+details.quiet > summary:hover { color: var(--ink); }
+details.quiet[open] > summary { margin-bottom: 0.4rem; }
+details.quiet label { margin-top: 0.5rem; }
+.deffb { margin-top: 0.9rem; }
+
+/* §§ DEFINITIONS (shown next to every value, never only on hover) */
+.val { min-width: 0; }
+.val .vname { font-weight: 600; }
+.val .vdef { font-size: var(--fs-s); color: var(--ink-2); margin: 0.1rem 0 0; line-height: 1.45; }
+.val .vdef.none { color: var(--warn); }
+
+/* §§ SPECTRUM */
+.poles2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; margin-top: 0.9rem; }
+.poles2 .val:last-child { text-align: right; }
+.spec { position: relative; display: flex; justify-content: space-between; align-items: center; margin: 1rem 0 0.2rem; height: 3rem; }
+.spec::before { content: ""; position: absolute; left: 1.2rem; right: 1.2rem; top: 50%; height: 2px; transform: translateY(-50%); background: var(--line); }
+.spec button { position: relative; width: 2.5rem; height: 2.5rem; min-height: 0; padding: 0; border-radius: 50%; border: 1.5px solid var(--ink-2); background: var(--surface); }
+.spec button::after { content: ""; position: absolute; inset: 0.6rem; border-radius: 50%; background: transparent; transition: background 0.2s var(--ease), inset 0.2s var(--ease); }
+.spec button[aria-checked="true"] { border-color: var(--accent); border-width: 2px; }
+.spec button[aria-checked="true"]::after { background: var(--accent); inset: 0.3rem; }
+.spec-read { margin-top: 0.4rem; font-weight: 600; min-height: 1.5rem; }
+.alt-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+
+/* §§ TRIANGLE */
+.tri-wrap { display: grid; gap: 1rem; margin-top: 0.8rem; }
+@media (min-width: 40em) { .tri-wrap { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; } }
+.tri { width: 100%; max-width: 20rem; display: block; margin: 0 auto; touch-action: none; cursor: crosshair; }
+.tri text { font-family: var(--font); fill: var(--ink); font-weight: 600; font-size: 14px; }
+.tri .grid { stroke: var(--line); opacity: 0.7; }
+.tri-read { font-weight: 600; }
+.vlist { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.7rem; }
+
+/* §§ ALLOCATE */
+.alloc-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.4rem 0.8rem; align-items: center; padding: 0.7rem 0; border-bottom: 1px solid var(--line); }
+.alloc-ctrl { display: flex; align-items: center; gap: 0.3rem; }
+.alloc-ctrl button { width: 2.5rem; padding: 0; font-size: 1.2rem; }
+.alloc-ctrl input { width: 4.2rem; text-align: center; }
+.alloc-bar { grid-column: 1 / -1; height: 4px; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
+.alloc-bar span { display: block; height: 100%; background: var(--accent); width: 0; transition: width 0.25s var(--ease); }
+.alloc-total { margin-top: 0.6rem; font-weight: 600; }
+
+/* §§ RANK */
+.rank { list-style: none; padding: 0; margin: 0.8rem 0 0; display: grid; gap: 0.4rem; }
+.rank li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0.6rem; align-items: center; background: var(--surface-2); border-radius: 8px; padding: 0.5rem 0.6rem; }
+.rank li.dragging { opacity: 0.6; outline: 2px dashed var(--accent); }
+.rank .grip { cursor: grab; touch-action: none; width: 2.2rem; min-height: 2.5rem; padding: 0; border-radius: 6px; font-size: 1.1rem; line-height: 1; background: transparent; border-color: transparent; color: var(--ink-2); }
+.rank .mv { display: flex; gap: 0.25rem; }
+.rank .mv button { width: 2.3rem; padding: 0; background: transparent; }
+.rank .pos { font-weight: 600; color: var(--ink-2); padding-top: 0.05rem; }
+.rank .rc { display: flex; gap: 0.5rem; min-width: 0; }
+@media (max-width: 30em) { .rank .mv { flex-direction: column; } .rank li { gap: 0.45rem; padding: 0.45rem; } }
+.rank li.divider { background: transparent; border: 1.5px dashed var(--bad); color: var(--bad); }
+.rank li.divider .dlabel { font-weight: 600; font-size: var(--fs-s); }
+.rank li.protected { box-shadow: inset 0 0 0 1px var(--bad); }
+
+/* §§ DILEMMA */
+.scenario { font-size: var(--fs-m); background: var(--surface-2); border-radius: 8px; padding: 0.8rem 1rem; margin-top: 0.7rem; }
+.opts { display: grid; gap: 0.7rem; margin-top: 0.8rem; }
+@media (min-width: 40em) { .opts { grid-template-columns: 1fr 1fr; } }
+.opt { text-align: left; border-radius: var(--radius); padding: 0.8rem 0.9rem; min-height: 5rem; display: flex; flex-direction: column; justify-content: flex-start; gap: 0.2rem; width: 100%; font-weight: 400; }
+.opt strong { display: block; font-weight: 600; }
+.opt[aria-pressed="true"] .muted { color: inherit; opacity: 0.85; }
+
+/* §§ DEFINE */
+.draft { background: var(--surface-2); padding: 0.8rem 1rem; border-radius: 8px; margin-top: 0.7rem; }
+.qgrid { display: grid; gap: 0.9rem; margin-top: 1rem; }
+.qgrid label span { font-size: var(--fs-s); font-weight: 600; }
+
+/* §§ BAR */
+.bar { position: fixed; left: 0; right: 0; bottom: 0; background: color-mix(in srgb, var(--surface) 94%, transparent); border-top: 1px solid var(--line); backdrop-filter: blur(6px); z-index: 10; }
+.bar-in { max-width: 46rem; margin: 0 auto; padding: 0.7rem 1rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.bar .progress { flex: 1 1 10rem; font-size: var(--fs-s); color: var(--ink-2); min-width: 0; }
+.out { margin-top: 2rem; }
+.out textarea { min-height: 8rem; font: 0.8rem/1.4 var(--mono); }
+.out pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 28rem; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 0.7rem; font: 0.78rem/1.45 var(--mono); margin: 0.6rem 0 0; }
+.status { font-weight: 600; margin-top: 0.4rem; }
+.sent { text-align: center; padding: 3rem 1rem; }
+@media (prefers-reduced-motion: no-preference) { .wrap > header { animation: rise 0.5s var(--ease) both; } }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="wrap" id="app"></main>
+<div class="bar" role="region" aria-label="Submit answers"><div class="bar-in" id="bar"></div></div>
+
+<!-- §§ SPEC_BLOCK: replaced by canvas_server.py; an empty spec shows a short notice. -->
+<script type="application/json" id="canvas-spec">{
+ "schema": "philosophical-alignment-canvas/0.1",
+ "id": "personal-app-idea-demo-2026-11-23",
+ "title": "Personal App Idea: where do you stand?",
+ "project": "Personal App Idea (example project)",
+ "intro": "Three short questions about how Personal App Idea, an example budgeting app, should weigh one good thing against another. Answer from how the app actually works today, not how you wish it did.",
+ "respondent": "",
+ "glossary": [
+  {
+   "id": "privacy",
+   "name": "Privacy",
+   "rev": 1,
+   "definition": "The degree to which your money data stays on your own device, readable only by you, unless you choose to send it somewhere in a form only you can unlock."
+  },
+  {
+   "id": "convenience",
+   "name": "Convenience",
+   "rev": 1,
+   "definition": "How little typing, setup and remembering it takes to keep your budget up to date."
+  },
+  {
+   "id": "simplicity",
+   "name": "Simplicity",
+   "rev": 1,
+   "definition": "How quickly a first-time budgeter can understand and use every screen they see by default, without help or a manual."
+  },
+  {
+   "id": "power",
+   "name": "Power",
+   "rev": 1,
+   "definition": "How much a person who wants depth can plan, analyse and customise their money in Personal App Idea without leaving it for a spreadsheet."
+  }
+ ],
+ "widgets": [
+  {
+   "id": "w1",
+   "kind": "spectrum",
+   "tension_id": "T01",
+   "prompt": "Where should Personal App Idea sit between privacy and convenience?",
+   "poles": [
+    {
+     "value": "Privacy",
+     "ref": "privacy"
+    },
+    {
+     "value": "Convenience",
+     "ref": "convenience"
+    }
+   ],
+   "steps": 7
+  },
+  {
+   "id": "w2",
+   "kind": "define",
+   "prompt": "When you say private, what do you mean?",
+   "value": {
+    "value": "Privacy",
+    "ref": "privacy"
+   },
+   "neighbor": {
+    "value": "Convenience",
+    "ref": "convenience"
+   },
+   "firmness": false
+  },
+  {
+   "id": "w3",
+   "kind": "dilemma",
+   "tension_id": "T02",
+   "prompt": "Forecasts for people who plan ahead",
+   "scenario": "Sam's prototype predicts the next three months of spending. People who plan ahead love it; in Maya's tests, first-time budgeters found the chart on the home screen confusing.",
+   "options": [
+    {
+     "id": "a",
+     "label": "Put the forecast on the home screen for everyone",
+     "detail": "Everyone sees it; new users meet a chart they may not understand.",
+     "leans_toward": "Power"
+    },
+    {
+     "id": "b",
+     "label": "Ship it in an opt-in Advanced view",
+     "detail": "The home screen stays as it is; people who want forecasts turn them on in Settings.",
+     "leans_toward": "Simplicity"
+    }
+   ],
+   "values": [
+    {
+     "value": "Simplicity",
+     "ref": "simplicity"
+    },
+    {
+     "value": "Power",
+     "ref": "power"
+    }
+   ],
+   "flip_prompt": "What would make you pick the other option?"
+  }
+ ]
+}</script>
+
+<script>
+/* §§ SCRIPT */
+(function () {
+  "use strict";
+  var app = document.getElementById("app"), bar = document.getElementById("bar");
+  var TOKEN = new URLSearchParams(location.search).get("t");
+  // Served by canvas_server.py? Only a page with a ?t= token over http(s) even asks (one
+  // same-origin GET /ping); everywhere else (file://, Artifacts, iframes) no request is made.
+  var MAY_BE_SERVED = /^https?:$/.test(location.protocol) && !!TOKEN, SERVED = false;
+  var SPEC = null, W = [], GL = {}, GLN = {};
+
+  // §§ HELPERS
+  function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function arr(v) { return Array.isArray(v) ? v : v == null ? [] : [v]; }
+  function shuffle(a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+  function nowIso() { return new Date().toISOString(); }
+  function el(html) { var d = document.createElement("div"); d.innerHTML = html.trim(); return d.firstChild; }
+  function normVal(v) {
+    var o = typeof v === "string" ? { value: v } : Object.assign({}, v || {});
+    o.value = o.value || o.name || o.label || "?";
+    var g = (o.ref && GL[o.ref]) || GLN[String(o.value).toLowerCase()] || null;
+    if (!o.ref && g) o.ref = g.id;
+    if (!o.definition && g) o.definition = g.definition;
+    o.rev = o.rev != null ? o.rev : g && g.rev != null ? g.rev : null;
+    return o;
+  }
+
+  // §§ WIDGET_STATE: shared bookkeeping for every widget
+  function makeState(spec, idx) {
+    return { spec: spec, idx: idx, result: null, initial: null, adjustments: 0, first: 0, last: 0,
+      answered: false, firmness: null, reason: "", note: "", defFeedback: {}, order: null, node: null };
+  }
+  function touch(s) { var t = Date.now(); if (!s.first) s.first = t; s.last = t; s.adjustments++; s.node.classList.remove("has-error"); var e = s.node.querySelector(".w-error"); if (e) e.textContent = ""; updateBar(); }
+
+  // §§ VALUE_WITH_DEFINITION (inline, plus an optional "edit this definition" note)
+  function valHTML(s, v, opts) {
+    opts = opts || {};
+    var key = v.ref || v.value;
+    return '<div class="val"><div class="vname">' + esc(v.value) + "</div>" +
+      (v.definition ? '<p class="vdef">' + esc(v.definition) + "</p>" : '<p class="vdef none">No definition yet. Say what you mean by it below.</p>') + "</div>";
+  }
+  // One disclosure per widget holds a "what it means to you" box for each value shown.
+  function wireDefs(s, vals) {
+    var byKey = {}; vals.forEach(function (v) { byKey[v.ref || v.value] = v; });
+    var undef = vals.some(function (v) { return !v.definition; });
+    var fb = el('<details class="quiet deffb"' + (undef ? " open" : "") + "><summary>A meaning here is not what I mean</summary></details>");
+    fb.insertAdjacentHTML("beforeend", vals.map(function (v) {
+      return '<label><span class="small">What does “' + esc(v.value) + '” mean to you here?</span><textarea data-defkey="' + esc(v.ref || v.value) + '"></textarea></label>';
+    }).join(""));
+    s.node.querySelector(".w-body").appendChild(fb);
+    s.node.querySelectorAll("textarea[data-defkey]").forEach(function (t) {
+      t.addEventListener("input", function () {
+        var v = byKey[t.getAttribute("data-defkey")];
+        if (t.value.trim()) s.defFeedback[t.getAttribute("data-defkey")] = { ref: v.ref || null, value: v.value, shown_definition: v.definition || null, rev: v.rev, suggested: t.value.trim() };
+        else delete s.defFeedback[t.getAttribute("data-defkey")];
+      });
+    });
+  }
+
+  // §§ WIDGET_SPECTRUM
+  function buildSpectrum(s) {
+    var sp = s.spec, poles = arr(sp.poles).map(normVal), steps = sp.steps === 5 ? 5 : 7;
+    var swap = !!sp.randomize_sides && Math.random() < 0.5, shown = swap ? [poles[1], poles[0]] : poles;
+    s.order = shown.map(function (p) { return p.value; });
+    s.initial = { position: null };
+    var h = '<div class="poles2">' + valHTML(s, shown[0]) + valHTML(s, shown[1]) + "</div>";
+    h += '<div class="spec" role="radiogroup" aria-label="Where do you stand between ' + esc(shown[0].value) + " and " + esc(shown[1].value) + '?">';
+    for (var i = 0; i < steps; i++) h += '<button type="button" role="radio" aria-checked="false" tabindex="' + (i === Math.floor(steps / 2) ? 0 : -1) + '" data-i="' + i + '" aria-label="' + esc(stepLabel(i, steps, shown)) + '"></button>';
+    h += "</div>";
+    h += '<p class="spec-read" aria-live="polite">Click a point on the line.</p>';
+    h += '<div class="alt-row"><button type="button" class="dep" aria-pressed="false">It depends</button><button type="button" class="dk" aria-pressed="false">Don’t know</button></div>';
+    h += '<label class="dep-box" hidden><span class="small">Depends on what? Name the condition that would move you.</span><textarea class="dep-text"></textarea></label>';
+    var body = s.node.querySelector(".w-body"); body.innerHTML = h;
+    var btns = body.querySelectorAll(".spec button"), read = body.querySelector(".spec-read"), dep = body.querySelector(".dep"), dk = body.querySelector(".dk"), depBox = body.querySelector(".dep-box"), depText = body.querySelector(".dep-text");
+    function select(i) {
+      btns.forEach(function (b, j) { b.setAttribute("aria-checked", String(j === i)); b.tabIndex = j === i ? 0 : -1; });
+      dep.setAttribute("aria-pressed", "false"); dk.setAttribute("aria-pressed", "false"); depBox.hidden = true;
+      var p = -1 + (2 * i) / (steps - 1), pos = swap ? -p : p;
+      s.result = { choice: "position", position: Math.round(pos * 1000) / 1000, step_index: i, steps: steps, label: stepLabel(i, steps, shown), scale: "-1 = fully " + poles[0].value + ", +1 = fully " + poles[1].value };
+      s.answered = true; read.textContent = stepLabel(i, steps, shown); touch(s);
+    }
+    btns.forEach(function (b, i) {
+      b.addEventListener("click", function () { select(i); });
+      b.addEventListener("keydown", function (e) {
+        var cur = Number(b.getAttribute("data-i")), n = null;
+        if (e.key === "ArrowRight" || e.key === "ArrowUp") n = Math.min(steps - 1, cur + 1);
+        if (e.key === "ArrowLeft" || e.key === "ArrowDown") n = Math.max(0, cur - 1);
+        if (e.key === "Home") n = 0; if (e.key === "End") n = steps - 1;
+        if (e.key === " " || e.key === "Enter") n = cur;
+        if (n !== null) { e.preventDefault(); select(n); btns[n].focus(); }
+      });
+    });
+    function alt(kind) {
+      btns.forEach(function (b) { b.setAttribute("aria-checked", "false"); });
+      dep.setAttribute("aria-pressed", String(kind === "depends")); dk.setAttribute("aria-pressed", String(kind === "dont_know"));
+      depBox.hidden = kind !== "depends";
+      s.result = kind === "depends" ? { choice: "depends", depends_on: depText.value.trim() } : { choice: "dont_know" };
+      s.answered = true; read.textContent = kind === "depends" ? "It depends. Say on what, below." : "Don’t know.";
+      touch(s); if (kind === "depends") depText.focus();
+    }
+    dep.addEventListener("click", function () { alt("depends"); });
+    dk.addEventListener("click", function () { alt("dont_know"); });
+    depText.addEventListener("input", function () { if (s.result && s.result.choice === "depends") s.result.depends_on = depText.value.trim(); });
+    wireDefs(s, poles);
+  }
+  function stepLabel(i, steps, shown) {
+    var mid = (steps - 1) / 2, d = i - mid, m = Math.abs(d) / mid;
+    if (d === 0) return "Even between " + shown[0].value + " and " + shown[1].value;
+    var who = d < 0 ? shown[0].value : shown[1].value;
+    return (m > 0.9 ? "Strongly toward " : m > 0.5 ? "Toward " : "Slightly toward ") + who;
+  }
+
+  // §§ WIDGET_TRIANGLE
+  var TV = [[160, 34], [26, 266], [294, 266]];
+  function toXY(w) { return [w[0] * TV[0][0] + w[1] * TV[1][0] + w[2] * TV[2][0], w[0] * TV[0][1] + w[1] * TV[1][1] + w[2] * TV[2][1]]; }
+  function toBary(x, y) {
+    var A = TV[0], B = TV[1], C = TV[2], den = (B[1] - C[1]) * (A[0] - C[0]) + (C[0] - B[0]) * (A[1] - C[1]);
+    var a = ((B[1] - C[1]) * (x - C[0]) + (C[0] - B[0]) * (y - C[1])) / den;
+    var b = ((C[1] - A[1]) * (x - C[0]) + (A[0] - C[0]) * (y - C[1])) / den;
+    var w = [a, b, 1 - a - b].map(function (v) { return Math.max(0, v); }), s = w[0] + w[1] + w[2];
+    return snap(w.map(function (v) { return v / s; }));
+  }
+  function snap(w) { // to tenths, summing to 10 by largest remainder
+    var t = w.map(function (v) { return v * 10; }), f = t.map(Math.floor), rem = 10 - f.reduce(function (a, b) { return a + b; }, 0);
+    var order = t.map(function (v, i) { return [v - Math.floor(v), i]; }).sort(function (a, b) { return b[0] - a[0]; });
+    for (var k = 0; k < rem; k++) f[order[k][1]]++;
+    return f.map(function (v) { return v / 10; });
+  }
+  function buildTriangle(s) {
+    var vals = arr(s.spec.values).map(normVal);
+    var shown = s.spec.randomize === false ? vals : shuffle(vals);
+    s.order = shown.map(function (v) { return v.value; }); s.initial = { weights: null };
+    var svg = '<svg class="tri" viewBox="0 0 320 300" tabindex="0" role="application" aria-label="Triangle of ' + esc(s.order.join(", ")) + '. Click a point, or use arrow keys: Up toward ' + esc(shown[0].value) + ", Left toward " + esc(shown[1].value) + ", Right toward " + esc(shown[2].value) + ', Down away from ' + esc(shown[0].value) + '.">';
+    svg += '<polygon points="' + TV.map(function (v) { return v.join(","); }).join(" ") + '" fill="var(--surface-2)" stroke="var(--ink-2)" stroke-width="1.5"/>';
+    for (var k = 1; k < 10; k++) for (var i = 0; i < 3; i++) {
+      var a = TV[i], b = TV[(i + 1) % 3], c = TV[(i + 2) % 3], f = k / 10;
+      svg += '<line class="grid" stroke-width="' + (k % 5 ? 0.6 : 1.2) + '" x1="' + (b[0] + (a[0] - b[0]) * f) + '" y1="' + (b[1] + (a[1] - b[1]) * f) + '" x2="' + (c[0] + (a[0] - c[0]) * f) + '" y2="' + (c[1] + (a[1] - c[1]) * f) + '"/>';
+    }
+    svg += '<text x="160" y="22" text-anchor="middle">' + esc(shown[0].value) + '</text><text x="20" y="290" text-anchor="start">' + esc(shown[1].value) + '</text><text x="300" y="290" text-anchor="end">' + esc(shown[2].value) + "</text>";
+    svg += '<g class="pt" style="display:none"><circle r="10" fill="var(--ink)" stroke="var(--surface)" stroke-width="3"/></g></svg>';
+    var h = '<div class="tri-wrap"><div>' + svg + '<p class="tri-read small" aria-live="polite">No point yet. Click inside the triangle.</p></div><ul class="vlist">' + shown.map(function (v) { return "<li>" + valHTML(s, v) + "</li>"; }).join("") + "</ul></div>";
+    var body = s.node.querySelector(".w-body"); body.innerHTML = h;
+    var el2 = body.querySelector(".tri"), pt = body.querySelector(".pt"), read = body.querySelector(".tri-read"), cur = null, dragging = false;
+    function place(w) {
+      cur = w; var p = toXY(w); pt.style.display = ""; pt.setAttribute("transform", "translate(" + p[0] + " " + p[1] + ")");
+      var weights = {}; shown.forEach(function (v, i) { weights[v.value] = w[i]; });
+      var canon = {}; vals.forEach(function (v) { canon[v.value] = weights[v.value]; });
+      s.result = { weights: canon, refs: vals.map(function (v) { return v.ref || null; }), precision: 0.1 };
+      s.answered = true;
+      read.textContent = shown.map(function (v, i) { return v.value + " " + Math.round(w[i] * 100) + "%"; }).join(" · ");
+    }
+    function fromEvent(e) { var m = el2.getScreenCTM(); if (!m) return null; var p = el2.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; p = p.matrixTransform(m.inverse()); return toBary(p.x, p.y); }
+    el2.addEventListener("pointerdown", function (e) { var w = fromEvent(e); if (!w) return; dragging = true; el2.setPointerCapture(e.pointerId); place(w); touch(s); });
+    el2.addEventListener("pointermove", function (e) { if (!dragging) return; var w = fromEvent(e); if (w && (!cur || w.join() !== cur.join())) place(w); });
+    el2.addEventListener("pointerup", function () { if (dragging) { dragging = false; touch(s); s.adjustments--; } });
+    el2.addEventListener("keydown", function (e) {
+      var map = { ArrowUp: 0, ArrowLeft: 1, ArrowRight: 2, ArrowDown: -1 };
+      if (!(e.key in map)) return; e.preventDefault();
+      var w = cur ? cur.slice() : [0.3, 0.3, 0.4], t = map[e.key];
+      if (cur) {
+        var to = t >= 0 ? t : 0;
+        if (t >= 0) { var others = [0, 1, 2].filter(function (i) { return i !== to && w[i] >= 0.1; }).sort(function (a, b) { return w[b] - w[a]; }); if (others.length) { w[others[0]] -= 0.1; w[to] += 0.1; } }
+        else if (w[0] >= 0.1) { var gi = w[1] <= w[2] ? 1 : 2; w[0] -= 0.1; w[gi] += 0.1; }
+        w = snap(w);
+      }
+      place(w); touch(s);
+    });
+    wireDefs(s, vals);
+  }
+
+  // §§ WIDGET_ALLOCATE
+  function buildAllocate(s) {
+    var vals = arr(s.spec.values).map(normVal), total = s.spec.total || 100, step = s.spec.step || 5;
+    var shown = s.spec.randomize === false ? vals : shuffle(vals), pts = {};
+    s.order = shown.map(function (v) { return v.value; });
+    shown.forEach(function (v) { pts[v.value] = 0; });
+    s.initial = { points: Object.assign({}, pts) };
+    var h = '<p class="small muted">Spread ' + total + " points by how much each value should win when they compete.</p>";
+    shown.forEach(function (v, i) {
+      h += '<div class="alloc-row">' + valHTML(s, v) + '<div class="alloc-ctrl"><button type="button" data-i="' + i + '" data-d="-1" aria-label="Less ' + esc(v.value) + '">−</button><input type="number" inputmode="numeric" min="0" max="' + total + '" step="' + step + '" value="0" data-i="' + i + '" aria-label="Points for ' + esc(v.value) + '"><button type="button" data-i="' + i + '" data-d="1" aria-label="More ' + esc(v.value) + '">+</button></div><div class="alloc-bar" aria-hidden="true"><span></span></div></div>';
+    });
+    h += '<p class="alloc-total" aria-live="polite"></p>';
+    var body = s.node.querySelector(".w-body"); body.innerHTML = h;
+    var inputs = body.querySelectorAll("input[type=number]"), bars = body.querySelectorAll(".alloc-bar span"), tot = body.querySelector(".alloc-total");
+    function refresh() {
+      var sum = 0; shown.forEach(function (v, i) { sum += pts[v.value]; bars[i].style.width = (100 * pts[v.value] / total) + "%"; inputs[i].value = pts[v.value]; });
+      var left = total - sum;
+      tot.textContent = left === 0 ? "Total " + total + ". Done." : left > 0 ? left + " points left to place." : "Over by " + (-left) + ". Take some back.";
+      tot.style.color = left === 0 ? "var(--ok)" : left < 0 ? "var(--bad)" : "";
+      var canon = {}; vals.forEach(function (v) { canon[v.value] = pts[v.value]; });
+      s.result = { points: canon, total: total, sum: sum, complete: left === 0, refs: vals.map(function (v) { return v.ref || null; }) };
+      s.answered = sum > 0;
+    }
+    body.querySelectorAll(".alloc-ctrl button").forEach(function (b) {
+      b.addEventListener("click", function () { var v = shown[+b.getAttribute("data-i")].value; pts[v] = Math.max(0, Math.min(total, pts[v] + step * +b.getAttribute("data-d"))); refresh(); touch(s); });
+    });
+    inputs.forEach(function (inp) {
+      inp.addEventListener("change", function () { var v = shown[+inp.getAttribute("data-i")].value, n = Math.round(Number(inp.value) || 0); pts[v] = Math.max(0, Math.min(total, n)); refresh(); touch(s); });
+    });
+    refresh();
+    wireDefs(s, vals);
+  }
+
+  // §§ WIDGET_RANK
+  var DIVIDER = "\u0000divider";
+  function buildRank(s) {
+    var vals = arr(s.spec.values).map(normVal), byName = {};
+    vals.forEach(function (v) { byName[v.value] = v; });
+    var shown = s.spec.randomize === false ? vals : shuffle(vals);
+    var order = [DIVIDER].concat(shown.map(function (v) { return v.value; }));
+    s.order = shown.map(function (v) { return v.value; });
+    s.initial = { order: s.order.slice(), above_line: [] };
+    var label = s.spec.line_label || "Above this line: never traded away";
+    var body = s.node.querySelector(".w-body");
+    body.innerHTML = '<p class="small muted">Most important at the top. Then move the red line down so everything above it is something you would never trade away; leave it at the top if nothing is absolute.</p><ol class="rank"></ol><label class="small" style="margin-top:.6rem;display:flex;gap:.5rem;align-items:center"><input type="checkbox" class="confirm"> This order is right as shown</label>';
+    var list = body.querySelector(".rank"), confirm = body.querySelector(".confirm");
+    function sync() {
+      var idx = order.indexOf(DIVIDER), items = order.filter(function (x) { return x !== DIVIDER; });
+      s.result = { order: items, above_line: order.slice(0, idx), below_line: order.slice(idx + 1), refs: items.map(function (n) { return byName[n].ref || null; }), confirmed: confirm.checked };
+      s.answered = confirm.checked || s.adjustments > 0;
+    }
+    function draw(focusKey) {
+      var idx = order.indexOf(DIVIDER), n = 0;
+      list.innerHTML = order.map(function (k, i) {
+        if (k === DIVIDER) return '<li class="divider" data-k="div"><button type="button" class="grip" aria-label="Drag the never-trade line">≡</button><span class="dlabel">' + esc(label) + '</span><span class="mv"><button type="button" data-mv="-1" aria-label="Move line up">↑</button><button type="button" data-mv="1" aria-label="Move line down">↓</button></span></li>';
+        n++;
+        return '<li class="' + (i < idx ? "protected" : "") + '" data-k="' + esc(k) + '"><button type="button" class="grip" aria-label="Drag ' + esc(k) + '">≡</button><div class="rc"><span class="pos">' + n + "</span>" + valHTML(s, byName[k], { noEdit: true }) + '</div><span class="mv"><button type="button" data-mv="-1" aria-label="Move ' + esc(k) + ' up">↑</button><button type="button" data-mv="1" aria-label="Move ' + esc(k) + ' down">↓</button></span></li>';
+      }).join("");
+      list.querySelectorAll("li").forEach(function (li, i) {
+        li.querySelectorAll("[data-mv]").forEach(function (b) {
+          b.addEventListener("click", function () {
+            var j = i + Number(b.getAttribute("data-mv")); if (j < 0 || j >= order.length) return;
+            var t = order[i]; order[i] = order[j]; order[j] = t; touch(s); sync(); draw(order[j] + "|" + b.getAttribute("data-mv"));
+          });
+        });
+        li.querySelector(".grip").addEventListener("pointerdown", function (e) { startDrag(e, li); });
+      });
+      if (focusKey) {
+        var parts = focusKey.split("|"), k2 = parts[0] === DIVIDER ? "div" : parts[0];
+        var li2 = Array.prototype.find.call(list.children, function (x) { return x.getAttribute("data-k") === k2; });
+        if (li2) li2.querySelector('[data-mv="' + parts[1] + '"]').focus();
+      }
+    }
+    function startDrag(e, li) {
+      // The dragged row stays in the DOM (moving it would drop pointer events in some
+      // browsers); its neighbours are moved past it instead.
+      e.preventDefault(); li.classList.add("dragging");
+      var startOrder = order.join("\u0001");
+      function move(ev) {
+        var items = Array.prototype.slice.call(list.children), me = items.indexOf(li), y = ev.clientY;
+        for (var i = 0; i < items.length; i++) {
+          if (i === me) continue;
+          var r = items[i].getBoundingClientRect(), mid = r.top + r.height / 2;
+          if (i > me && y > mid) { list.insertBefore(items[i], li); return; }
+          if (i < me && y < mid) { list.insertBefore(items[i], li.nextSibling); return; }
+        }
+      }
+      function up() {
+        document.removeEventListener("pointermove", move); document.removeEventListener("pointerup", up); document.removeEventListener("pointercancel", up);
+        order = Array.prototype.map.call(list.children, function (x) { var k = x.getAttribute("data-k"); return k === "div" ? DIVIDER : k; });
+        if (order.join("\u0001") !== startOrder) touch(s);
+        sync(); draw();
+      }
+      document.addEventListener("pointermove", move); document.addEventListener("pointerup", up); document.addEventListener("pointercancel", up);
+    }
+    confirm.addEventListener("change", function () { touch(s); sync(); });
+    draw(); sync();
+    wireDefs(s, vals); // definitions are inline per item; feedback lives in one disclosure below the list
+  }
+
+  // §§ WIDGET_DILEMMA
+  function buildDilemma(s) {
+    var sp = s.spec, opts = arr(sp.options).map(function (o, i) { return typeof o === "string" ? { id: String.fromCharCode(97 + i), label: o } : o; });
+    var shown = sp.randomize === false ? opts : shuffle(opts);
+    s.order = shown.map(function (o) { return o.id; }); s.initial = { chosen: null };
+    var h = '<div class="scenario">' + esc(sp.scenario || "") + '</div><div class="opts">' + shown.map(function (o) {
+      return '<button type="button" class="opt" aria-pressed="false" data-id="' + esc(o.id) + '"><strong>' + esc(o.label) + "</strong>" + (o.detail ? '<span class="muted small">' + esc(o.detail) + "</span>" : "") + "</button>";
+    }).join("") + "</div>";
+    h += '<label style="margin-top:.8rem"><span style="font-weight:600">' + esc(sp.flip_prompt || "What would make you pick the other one?") + ' <span class="muted small">(required)</span></span><textarea class="flip"></textarea></label>';
+    var vals = arr(sp.values).map(normVal);
+    if (vals.length) h += '<div style="margin-top:1rem"><h3 class="sub">Values in play</h3><ul class="vlist" style="margin-top:.4rem">' + vals.map(function (v) { return "<li>" + valHTML(s, v) + "</li>"; }).join("") + "</ul></div>";
+    var body = s.node.querySelector(".w-body"); body.innerHTML = h;
+    var flip = body.querySelector(".flip");
+    body.querySelectorAll(".opt").forEach(function (b) {
+      b.addEventListener("click", function () {
+        body.querySelectorAll(".opt").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+        var o = opts.filter(function (x) { return x.id === b.getAttribute("data-id"); })[0];
+        s.result = { chosen: o.id, chosen_label: o.label, would_flip_if: flip.value.trim(), leans_toward: o.leans_toward || null };
+        s.answered = true; touch(s);
+      });
+    });
+    flip.addEventListener("input", function () { if (s.result) s.result.would_flip_if = flip.value.trim(); });
+    if (vals.length) wireDefs(s, vals);
+  }
+
+  // §§ WIDGET_DEFINE (the respondent explains a value in their own words before a definition is drafted)
+  function buildDefine(s) {
+    var v = normVal(s.spec.value), nb = s.spec.neighbor ? normVal(s.spec.neighbor) : null;
+    s.initial = { draft_definition: v.definition || null, rev: v.rev };
+    var qs = [
+      ["own_words", "What does “" + v.value + "” mean here, in your words? Take as much room as you need."],
+      ["example_good", "An example of it done well (a real feature, decision or moment)."],
+      ["example_missing", "An example of it missing, or faked: it looked like " + v.value + " but was not."],
+      ["misnomers", "What do people call “" + v.value + "” that you would not?"]
+    ];
+    if (nb) qs.push(["differs_from_neighbor", "How does " + v.value + " differ from " + nb.value + "?"]);
+    var h = '<div class="draft"><p class="sub">Current draft definition of “' + esc(v.value) + '”</p>' +
+      (v.definition ? "<p>" + esc(v.definition) + "</p>" : '<p class="muted">No draft yet. Your answers below become the first one.</p>') + "</div>";
+    if (nb) h += '<div class="small" style="margin-top:.6rem"><span class="muted">For comparison, </span>' + valHTML(s, nb, { noEdit: true }) + "</div>";
+    h += '<div class="qgrid">' + qs.map(function (q) { return '<label><span>' + esc(q[1]) + '</span><textarea data-q="' + q[0] + '"' + (q[0] === "own_words" ? ' style="min-height:6rem"' : "") + "></textarea></label>"; }).join("") + "</div>";
+    if (v.definition) h += '<div class="seg" style="margin-top:.9rem"><span class="lbl">The draft definition</span><button type="button" data-verdict="looks_right" aria-pressed="false">Looks right</button><button type="button" data-verdict="needs_changes" aria-pressed="false">Needs changes</button></div><label class="chg" hidden style="margin-top:.5rem"><span class="small">What should change?</span><textarea data-q="requested_change"></textarea></label>';
+    var body = s.node.querySelector(".w-body"); body.innerHTML = h;
+    s.result = { value: v.value, ref: v.ref || null, neighbor: nb ? nb.value : null, draft_verdict: null };
+    body.querySelectorAll("textarea[data-q]").forEach(function (t) {
+      t.addEventListener("input", function () { s.result[t.getAttribute("data-q")] = t.value.trim(); s.answered = !!(s.result.own_words); touch(s); });
+    });
+    body.querySelectorAll("[data-verdict]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        body.querySelectorAll("[data-verdict]").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+        s.result.draft_verdict = b.getAttribute("data-verdict");
+        body.querySelector(".chg").hidden = s.result.draft_verdict !== "needs_changes"; touch(s);
+      });
+    });
+  }
+
+  // §§ WIDGET_SHELL
+  var BUILDERS = { spectrum: buildSpectrum, triangle: buildTriangle, allocate: buildAllocate, rank: buildRank, dilemma: buildDilemma, define: buildDefine };
+  var KIND_LABEL = { spectrum: "Spectrum", triangle: "Three-way", allocate: "Allocate", rank: "Rank", dilemma: "Dilemma", define: "Define" };
+  function buildWidget(spec, i) {
+    var s = makeState(spec, i), kind = spec.kind;
+    var showFirm = spec.firmness !== false && kind !== "define";
+    var node = el('<section class="w" id="w-' + esc(spec.id || i) + '" aria-labelledby="wh-' + i + '">' +
+      '<h2 id="wh-' + i + '" class="w-prompt"><span class="w-num" aria-label="Question ' + (i + 1) + " of " + arr(SPEC.widgets).length + '">' + (i + 1) + "</span><span>" + esc(spec.prompt || (kind === "define" ? "Tell us what this word means to you" : "")) + "</span></h2>" +
+      '<div class="w-body"></div><div class="w-foot">' +
+      (showFirm ? '<div class="seg" role="group" aria-label="How strongly do you hold this answer?"><span class="lbl">How strongly do you hold this?</span><button type="button" data-f="loose" aria-pressed="false">Loosely</button><button type="button" data-f="firm" aria-pressed="false">Firmly</button><button type="button" data-f="core" aria-pressed="false">As a core principle</button></div>' +
+        '<label class="reason-box" hidden><span class="small"><strong>One line on why</strong> (needed when you hold it firmly or as a core principle)</span><input type="text" class="reason"></label>' : "") +
+      '<details class="quiet"><summary>Add a note</summary><label><span class="small muted">Caveats, or anything this question could not capture</span><textarea class="note"></textarea></label></details><p class="w-error" role="alert"></p></div></section>');
+    s.node = node;
+    app.appendChild(node);
+    if (!BUILDERS[kind]) { node.querySelector(".w-body").innerHTML = '<p class="err">Unknown widget kind “' + esc(kind) + '”. Use the note field to answer.</p>'; s.initial = null; }
+    else BUILDERS[kind](s);
+    node.querySelector(".note").addEventListener("input", function (e) { s.note = e.target.value.trim(); if (!BUILDERS[kind]) s.answered = !!s.note; updateBar(); });
+    node.querySelectorAll("[data-f]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var on = b.getAttribute("aria-pressed") !== "true";
+        node.querySelectorAll("[data-f]").forEach(function (x) { x.setAttribute("aria-pressed", String(on && x === b)); });
+        s.firmness = on ? b.getAttribute("data-f") : null;
+        node.querySelector(".reason-box").hidden = !(s.firmness === "firm" || s.firmness === "core");
+        updateBar();
+      });
+    });
+    var r = node.querySelector(".reason"); if (r) r.addEventListener("input", function () { s.reason = r.value.trim(); });
+    return s;
+  }
+
+  // §§ RESULT
+  function respondent() { var r = document.getElementById("respondent"); return (r && r.value.trim()) || SPEC.respondent || null; }
+  function collect(via) {
+    var who = respondent(), ts = nowIso();
+    return {
+      schema: "philosophical-alignment-canvas-result/0.1", canvas_id: SPEC.id || null, canvas_title: SPEC.title || null,
+      project: SPEC.project || null, respondent: who, submitted_at: ts, via: via,
+      results: W.map(function (s) {
+        var fb = Object.keys(s.defFeedback).map(function (k) { return s.defFeedback[k]; });
+        return { widget: s.spec.id || "w" + (s.idx + 1), kind: s.spec.kind, tension_id: s.spec.tension_id || null,
+          result: s.answered ? s.result : null, initial_state: s.initial, adjustments: Math.max(0, s.adjustments),
+          seconds_spent: s.first ? Math.round((s.last - s.first) / 100) / 10 : 0, answered: s.answered,
+          firmness: s.firmness, reason: s.reason || null, note: s.note || null, definition_feedback: fb,
+          presentation_order: s.order, respondent: who, timestamp: ts };
+      })
+    };
+  }
+  function check() {
+    var bad = [];
+    W.forEach(function (s) {
+      var msg = "";
+      if ((s.firmness === "firm" || s.firmness === "core") && !s.reason) msg = "Add one line on why you hold this " + (s.firmness === "core" ? "as a core principle" : "firmly") + ".";
+      if (s.spec.kind === "dilemma" && s.answered && !(s.result && s.result.would_flip_if)) msg = "Say what would make you pick the other option.";
+      if (s.spec.kind === "spectrum" && s.result && s.result.choice === "depends" && !s.result.depends_on) msg = "Say what it depends on.";
+      s.node.querySelector(".w-error").textContent = msg;
+      s.node.classList.toggle("has-error", !!msg);
+      if (msg) bad.push(s);
+    });
+    if (bad.length) { bad[0].node.scrollIntoView({ behavior: "smooth", block: "center" }); setStatus(bad.length + " answer" + (bad.length > 1 ? "s need" : " needs") + " a short reason first.", true); }
+    return !bad.length;
+  }
+  function showOut(json) {
+    var o = document.getElementById("out");
+    if (!o) { o = el('<section class="out" id="out"><h2>Your answers</h2><p class="small muted">If copying did not work, select everything in this box and copy it into the conversation.</p><textarea readonly aria-label="Answers as JSON"></textarea><p class="small muted" style="margin-top:.8rem">The same answers as page text:</p><pre id="answers-json"></pre></section>'); app.appendChild(o); }
+    o.querySelector("textarea").value = json; o.querySelector("pre").textContent = json; return o;
+  }
+  function setStatus(t, isErr) { var p = document.getElementById("status"); p.textContent = t; p.style.color = isErr ? "var(--bad)" : "var(--ok)"; }
+  function doCopy() {
+    if (!check()) return;
+    var json = JSON.stringify(collect("copy"), null, 2), o = showOut(json), ta = o.querySelector("textarea");
+    function fallback() { ta.focus(); ta.select(); var ok = false; try { ok = document.execCommand("copy"); } catch (e) {} setStatus(ok ? "Copied. Paste it into the conversation." : "Copy was blocked. Select the text in the box below and copy it.", !ok); o.scrollIntoView({ behavior: "smooth" }); }
+    // Inside sandboxes (Artifacts, iframes) the clipboard can be missing, throw, or reject;
+    // the visible text box above is always filled first, so it is the last resort.
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(json).then(function () { setStatus("Copied. Paste it into the conversation. The text is also in the box below."); }, fallback);
+      else fallback();
+    } catch (e) { fallback(); }
+  }
+  function doDownload() {
+    if (!check()) return;
+    var json = JSON.stringify(collect("download"), null, 2);
+    showOut(json);
+    var name = "canvas-answers-" + String(SPEC.id || "canvas").replace(/[^\w.-]+/g, "_") + (respondent() ? "-" + respondent().replace(/[^\w.-]+/g, "_") : "") + ".json";
+    try {
+      var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([json], { type: "application/json" })); a.download = name;
+      document.body.appendChild(a); a.click(); setTimeout(function () { try { URL.revokeObjectURL(a.href); } catch (e) {} a.remove(); }, 1000);
+      setStatus("Saving " + name + ". If no file appears, copy the text in the box below instead.");
+    } catch (e) { setStatus("Downloads are blocked here. Copy the text in the box below instead.", true); }
+    document.getElementById("out").scrollIntoView({ behavior: "smooth" });
+  }
+  function doSend() {
+    if (!check()) return;
+    var json = JSON.stringify(collect("server"));
+    setStatus("Sending…");
+    fetch("/result?t=" + encodeURIComponent(TOKEN), { method: "POST", headers: { "Content-Type": "application/json" }, body: json })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (b) { if (!r.ok) throw new Error(b.error || "HTTP " + r.status); return b; }); })
+      .then(function () {
+        app.innerHTML = '<div class="sent"><h1>Sent. Thank you.</h1><p class="intro">Your answers reached your AI assistant. You can close this tab and return to the conversation.</p></div>';
+        showOut(JSON.stringify(JSON.parse(json), null, 2));
+        bar.innerHTML = ""; window.scrollTo(0, 0);
+      })
+      .catch(function (e) { setStatus("Could not send (" + e.message + "). Use Copy or Download instead.", true); });
+  }
+
+  // §§ BAR
+  function updateBar() {
+    var n = W.filter(function (s) { return s.answered; }).length, p = document.getElementById("prog");
+    if (p) p.textContent = n + " of " + W.length + " answered" + (n < W.length ? "; unanswered ones are sent as blank" : "");
+    W.forEach(function (s) { s.node.classList.toggle("done", s.answered); });
+  }
+  function drawBar() {
+    bar.innerHTML = '<span class="progress"><span id="prog"></span><br><span id="status" class="status" role="status"></span></span>' +
+      (SERVED ? '<button type="button" class="primary" id="send">Send to your AI assistant</button>' : "") +
+      '<button type="button" id="copy"' + (SERVED ? "" : ' class="primary"') + '>Copy answers</button><button type="button" id="dl">Download answers</button>';
+    if (SERVED) document.getElementById("send").addEventListener("click", doSend);
+    document.getElementById("copy").addEventListener("click", doCopy);
+    document.getElementById("dl").addEventListener("click", doDownload);
+    updateBar();
+  }
+
+  // §§ BOOT
+  try { var t = (document.getElementById("canvas-spec").textContent || "").trim(); SPEC = t && t !== "null" ? JSON.parse(t) : null; }
+  catch (e) { app.innerHTML = '<p class="err">The canvas spec could not be read: ' + esc(e.message) + "</p>"; return; }
+  if (!SPEC || !arr(SPEC.widgets).length) { app.innerHTML = '<h1>Philosophy canvas</h1><p class="intro">This canvas has no questions yet. Your AI assistant fills them in before sending it to you.</p>'; return; }
+  arr(SPEC.glossary).forEach(function (g) { if (g && g.id) { GL[g.id] = g; if (g.name) GLN[String(g.name).toLowerCase()] = g; } });
+  document.title = SPEC.title ? SPEC.title : "Philosophy Canvas";
+  var showProject = SPEC.project && String(SPEC.title || "").toLowerCase().indexOf(String(SPEC.project).toLowerCase()) < 0;
+  app.innerHTML = "<header><h1>" + esc(SPEC.title || "A few questions") + "</h1>" + (showProject ? '<p class="small muted">' + esc(SPEC.project) + " philosophy</p>" : "") +
+    (SPEC.intro ? '<p class="intro">' + esc(SPEC.intro) + "</p>" : "") +
+    '<p class="small muted">No right answers, and nothing starts filled in. Each value’s meaning sits beside it; if one is wrong, say so under “A meaning here is not what I mean”.</p>' +
+    '<label class="who"><span class="small">Your name or handle</span><input type="text" id="respondent" autocomplete="name" value="' + esc(SPEC.respondent || "") + '"></label></header>';
+  W = arr(SPEC.widgets).map(buildWidget);
+  drawBar();
+  if (MAY_BE_SERVED) {
+    fetch("/ping?t=" + encodeURIComponent(TOKEN), { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (b) { if (b && b.canvas_server) { SERVED = true; drawBar(); } })
+      .catch(function () { /* not our server: Copy and Download remain */ });
+  }
+})();
+</script>
+</body>
+</html>

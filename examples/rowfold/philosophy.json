@@ -1,8 +1,8 @@
 {
-  "schema": "architectural-philosophy/0.1-draft",
+  "schema": "philosophical-alignment/0.1-draft",
   "project": "rowfold (example package)",
   "version": "1.1.1",
-  "status_note": "EXAMPLE PACKAGE. rowfold is fictional, invented for the architectural-philosophy demo on 2026-11-20 (the name was unregistered on PyPI that day). Its maintainers, releases, dates and quotes are illustrative, not a real project's record.",
+  "status_note": "EXAMPLE PACKAGE. rowfold is fictional, invented for the Philosophical Alignment demo on 2026-11-20 (the name was unregistered on PyPI that day). Its maintainers, releases, dates and quotes are illustrative, not a real project's record.",
   "mission": "Example package: rowfold is a small, pure-Python library for reading and transforming tabular files (CSV, TSV and fixed-width), and many downstream projects depend on it.",
   "project_types": [
     "library"

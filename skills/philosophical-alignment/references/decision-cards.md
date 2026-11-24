@@ -28,8 +28,8 @@ overlays a proposal on the map page, the strictness levels, and when to skip the
 
 When a proposal touches one or more tensions in the philosophy, the agent reads the current file, checks the
 hard limits first, and writes a card that opens with a two-to-four-sentence "Bottom line" and then names each touched tension by ID and revision (`T01@1`), quotes the
-one-line definitions of the values involved, gives one of three verdicts per tension (Consistent, Departs, Flip
-condition met), lists the options including doing nothing, and ends with the decision the human needs to make.
+one-line definitions of the values involved, gives one of three verdicts per tension (Consistent, Departs, Allowed
+exception), lists the options including doing nothing, and ends with the decision the human needs to make.
 The philosophy is advisory by default: the card informs; the human decides. The agent never invents a stance
 the file does not contain, never uses a value word in a sense its definition excludes, and never silently
 overrides a recorded stance.
@@ -76,7 +76,7 @@ Write a card when:
 - the user asks "why" about a design choice, or asks for a review against the philosophy;
 - strictness is above advisory and the work in progress touches a tension (see the table below).
 
-Skip the card, and say so in one line ("No philosophy tensions touched."), when:
+Skip the card, and say so in one line ("No priorities touched."), when:
 
 - the change is mechanical or local (a typo, a rename, a test for existing behaviour, a version bump that changes
   nothing a tension describes);
@@ -107,11 +107,11 @@ I propose <option> over <the strongest alternative>, to gain <values favoured>, 
 
 **Values involved:** <value>@<rev>: "<one-line glossary definition>"; <value>@<rev>: "<definition>"
 
-**Tensions touched**
+**Priorities touched**
 
-| Tension | Project stance | This proposal | Verdict |
-|---------|----------------|---------------|---------|
-| T02@2 Portability vs. raw speed | Portability first (firm) | Leans performance: adds compiled code as an optional extra | Flip condition met: "<quote>" |
+| Priority | Where we stand | This proposal | Verdict |
+|----------|----------------|---------------|---------|
+| T02@2 Portability vs. raw speed | Portability first (firm) | Leans performance: adds compiled code as an optional extra | Allowed exception: "<quote>" |
 | T04@1 Approachability, performance, correctness | Correctness first, then approachability | Same output, faster | Consistent |
 
 **Options** (at least two, including doing nothing)
@@ -162,7 +162,7 @@ Use exactly one per touched tension. Never "partially aligned".
 |---------|---------|------------|
 | **Consistent** | The proposal leans where the stance leans (or stays within its weights or priority). | `"consistent"` |
 | **Departs** | The proposal leans the other way, and no flip condition applies. | `"departs"` |
-| **Flip condition met** | The proposal leans the other way, and a recorded flip condition applies. Quote it. | `"flip_condition_met"` |
+| **Allowed exception** | The proposal leans the other way, and a recorded flip condition (an exception the project would accept) applies. Quote it. | `"flip_condition_met"` |
 
 Special cases:
 
@@ -221,7 +221,7 @@ proposal" box.
 
 ```json
 {
-  "schema": "architectural-philosophy-proposal/0.1",
+  "schema": "philosophical-alignment-proposal/0.1",
   "title": "Short noun phrase naming the proposal",
   "bluf": "Two to four plain sentences: what is proposed, how it fits overall, and the one decision needed.",
   "overall": "needs_decision",
@@ -243,7 +243,7 @@ proposal" box.
 
 | Field | Meaning |
 |-------|---------|
-| `schema` | `"architectural-philosophy-proposal/0.1"`. |
+| `schema` | `"philosophical-alignment-proposal/0.1"`. Proposals labelled `"architectural-philosophy-proposal/0.1"` (the skill's earlier name) are read the same way. |
 | `title`, `summary` | The proposal in a phrase and in one or two sentences. |
 | `bluf` | Bottom line up front: 2 to 4 plain sentences covering what is proposed, how it fits the philosophy overall, and the one decision needed. Shown first on the map; the same text as the card's "Bottom line". |
 | `overall` | Optional overall fit: `consistent` (every verdict consistent or flip condition met, no hard limit at risk), `departs` (at least one departure, no hard limit at risk, and the effective strictness lets the agent proceed with an explanation), or `needs_decision` (a hard limit at risk, a contested tension touched, or the effective strictness requires a human yes). |
@@ -326,11 +326,11 @@ quickly, and within how little memory, rowfold reads and transforms large files 
 correctness@1: "The degree to which every table rowfold returns matches what the file actually holds, or
 rowfold raises a clear error instead of returning a guess."
 
-**Tensions touched**
+**Priorities touched**
 
-| Tension | Project stance | This change (required C extension) | Reshaped: optional `rowfold[fast]` |
-|---------|----------------|-----------------------------------|------------------------------------|
-| T02@2 Portability vs. raw speed | Portability first (-0.5, firm) | Departs: compiled code becomes required and the pure-Python parser is removed | Flip condition met: "Compiled code is welcome as an optional extra with a pure-Python fallback that gives identical results." |
+| Priority | Where we stand | This change (required C extension) | Reshaped: optional `rowfold[fast]` |
+|----------|----------------|-----------------------------------|------------------------------------|
+| T02@2 Portability vs. raw speed | Portability first (-0.5, firm) | Departs: compiled code becomes required and the pure-Python parser is removed | Allowed exception: "Compiled code is welcome as an optional extra with a pure-Python fallback that gives identical results." |
 | T04@1 Approachability, performance, correctness | Correctness 50%, approachability 30%, performance 20% (firm) | Departs: with the reference parser gone, nothing independent checks the C parser's output | Consistent: both parsers must give identical output on the full test corpus |
 | T03@1 Small core vs. batteries included | Small core (-0.7, firm) | Not touched | Consistent: the compiled code ships as an extra, so the core install gains no dependency |
 
@@ -362,7 +362,7 @@ The contributor's change as a proposal file (`proposals/required-c-extension.jso
 
 ```json
 {
-  "schema": "architectural-philosophy-proposal/0.1",
+  "schema": "philosophical-alignment-proposal/0.1",
   "title": "Rewrite the core parser as a required C extension",
   "summary": "A contributor's agent proposes rewriting rowfold's core parser in C, as a required compiled extension, for about ten times the speed on large files. (Example package.)",
   "bluf": "A contributor's agent proposes replacing rowfold's pure-Python parser with a required C extension for about ten times the speed. The speed is welcome, but making compiled code mandatory goes against the portability-first stance and breaks the promise that installing rowfold never needs a compiler. Decision needed: ask the contributor to reshape it as an optional extra with a pure-Python fallback?",
@@ -387,7 +387,7 @@ carry the right-hand column of the table above:
 
 ```json
 {
-  "schema": "architectural-philosophy-proposal/0.1",
+  "schema": "philosophical-alignment-proposal/0.1",
   "title": "Optional compiled fast parser (rowfold[fast])",
   "summary": "Add an optional compiled parser, installed with \"pip install rowfold[fast]\", with the pure-Python parser as the fallback, and test both for identical output. (Example package.)",
   "bluf": "Add an optional compiled parser, installed with \"pip install rowfold[fast]\"; rowfold uses it when present and falls back to the pure-Python parser otherwise, and one shared test suite checks that both give identical output. This is the case the philosophy already welcomes, compiled code as an optional extra with an identical-results fallback, so plain installs and correctness are untouched. Decision needed: approve the optional [fast] extra?",

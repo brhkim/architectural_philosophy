@@ -1,48 +1,71 @@
 ---
-name: architectural-philosophy
+name: philosophical-alignment
 description: >-
-  Interviews a project's maintainers to write down its architectural philosophy: defined values, the
-  trade-offs it navigates (two-way, three-way and many-to-many), where it stands, when stances flip, hard
-  limits and precedents. Keeps it living through versioned amendments, reconciles several maintainers'
-  views without averaging, and has agents cite it in decision cards when proposing or reviewing changes. Use
-  for capturing design values, principles, tenets or trade-offs of a library, app, package manager, research
-  or data-analysis project, onboarding a maintainer, or checking a proposal against the philosophy. Not for
-  writing a single ADR.
+  Keeps AI assistants' work aligned with a person's or team's vision, values and priorities across
+  planning, building, review and revision. Interviews the people behind a project to write down its
+  philosophy: defined values, the priorities that compete (two-way, three-way and many-to-many trade-offs),
+  where the project stands on each, the exceptions it would accept, lines it never crosses, and precedents.
+  Keeps it living through versioned amendments, reconciles several people's views without averaging, and has
+  agents check plans and changes against it and explain them in decision cards. Use for capturing design
+  values, principles, priorities, tenets or trade-offs of software, a library, app, game, research or
+  data-analysis project, onboarding a teammate, checking a plan or proposal against the project's priorities,
+  or reviewing a change for fit with the user's judgment. Not for writing a single ADR.
 metadata:
   audience: any-agent
   domain: project-governance
-  skill-version: "0.1.0"
-  data-schema: "architectural-philosophy/0.1-draft"
+  skill-version: "0.2.0"
+  data-schema: "philosophical-alignment/0.1-draft"
+  accepts-data-schema: "architectural-philosophy/0.1-draft (the skill's earlier name; read unchanged)"
 ---
 
-# Architectural Philosophy
+# Philosophical Alignment
 
-Helps a project write down how it makes trade-offs, keep that record current, and use it. The agent acts as a
+Helps a person or a team write down their values and priorities, keep that record current, and use it so the
+work AI assistants do stays aligned with their vision and judgment. The philosophy is what people write down;
+alignment is what they get. The agent acts as a
 neutral facilitator: it interviews each maintainer in four styles (abstract discussion of values, a
 retrospective walkthrough of a real decision, forced-choice scenarios, and contradiction checks), defines every
 value in the maintainer's own words before anything is weighed, and records the result as one plain JSON file
 with a generated readable view and an interactive map page. The philosophy is living: interviews resume across
 sessions, stances change through a logged amendment process, and a team's individual philosophies are
 reconciled into a shared one through rounds that keep disagreement visible instead of averaging it. Later,
-any agent working on the project reads the philosophy and explains its proposals through a short decision card
-that cites the trade-offs by ID. It works for open-source libraries, applications, package managers, research
+any agent working on the project reads the philosophy and explains its plans and changes through a short
+decision card that cites the priorities it touches by ID. It works for open-source libraries, applications, package managers, research
 projects and data analyses, assumes no existing documentation system, and needs nothing beyond plain files
 (Python's standard library is optional, for the helper scripts).
 
 ## What a philosophy contains
 
+Vocabulary: people talk about **values and priorities**; the data file keeps its own field names. A
+**tension** (`tensions[]`) is a set of priorities that compete; its **stance** is where the project stands on
+it; **flip conditions** are the exceptions the project would accept; **hard limits** are the lines it never
+crosses. The generated pages and `PHILOSOPHY.md` show the plain names ("Priorities", "Where we stand",
+"Exceptions we'd accept", "Lines we never cross"); agents may use either, but cite IDs (`T02@2`, `H1`) exactly.
+
 | Part | What it is | Example |
 |------|-----------|---------|
 | **Mission** | What the project is for, in a sentence or two | "A small, pure-Python library for reading and transforming tabular files, which many downstream projects depend on." |
 | **Values glossary** | One explicit, operational definition per value, built from the maintainer's own explanation | Correctness: "The degree to which every table rowfold returns matches what the file actually holds, or rowfold raises a clear error instead of returning a guess." |
-| **Hard limits** | Constraints that are never traded | "pip install works everywhere we support, with no compiler required." |
-| **Tensions** | Trade-offs between values that are each worth wanting: a pair (polarity), three (triad), or four or more (network) | Portability vs. raw speed; Approachability, performance, correctness |
-| **Stance** | Where the project sits on each tension, with firmness | "Portability first: the pure-Python parser is the reference. Compiled extras are welcome when optional." (firm) |
-| **Flip conditions** | Observable conditions under which the stance changes | "Compiled code is welcome as an optional extra with a pure-Python fallback that gives identical results." |
+| **Hard limits** (lines we never cross) | Constraints that are never traded | "pip install works everywhere we support, with no compiler required." |
+| **Tensions** (priorities that compete) | Trade-offs between values that are each worth wanting: a pair (polarity), three (triad), or four or more (network) | Portability vs. raw speed; Approachability, performance, correctness |
+| **Stance** (where we stand) | Where the project sits on each tension, with firmness | "Portability first: the pure-Python parser is the reference. Compiled extras are welcome when optional." (firm) |
+| **Flip conditions** (exceptions we'd accept) | Observable conditions under which the stance changes | "Compiled code is welcome as an optional extra with a pure-Python fallback that gives identical results." |
 | **Precedents** | Real past decisions that show the stance applied | "Optional [zstd] compression extra: compiled and opt-in; the standard-library path keeps working without it." |
 
 The examples come from rowfold, a fictional tabular-file library whose full philosophy is in the skill
-repository's `examples/rowfold/` folder.
+repository's `examples/rowfold/` folder. A second example, `examples/personal-app-idea/`, is a fictional
+budgeting app with three proposal reviews.
+
+## Where it fits in your work
+
+The same files and the same contract serve every phase of a project; nothing extra runs in any of them.
+
+| Phase | What the agent does with the philosophy | Where it is described |
+|-------|------------------------------------------|-----------------------|
+| **Planning** | Reads the current file before choosing an approach, checks the lines the project never crosses first, and prefers the option at the stance's preferred pole; for a significant plan it drafts a decision card before any code exists. | "Using the philosophy when proposing or reviewing a change" below; `./references/decision-cards.md` |
+| **Building** | Builds the chosen option. At `flag-and-ask` or `review-gate` strictness it stops before implementing anything that departs from a stance, and it never edits the philosophy as a side effect of feature work. | "Strictness" below |
+| **Review** | Attaches a decision card to each significant change: the bottom line, the priorities touched (by ID) with one verdict each, and the one decision needed. A proposal JSON turns the map page into a review page. | `./references/decision-cards.md` |
+| **Revision** | Feedback can name the exact priority (`T02@2`), so fixes stay targeted. When a stance itself no longer fits, the agent proposes an amendment instead of bending the work around it. | `./references/amendments.md` |
 
 **Bottom line up front.** Every document opens with a short plain-language summary: the philosophy with a
 3-to-5-sentence `synthesis` that the agent drafts and the maintainers confirm (refreshed with every amendment
@@ -64,10 +87,10 @@ What does the user want?
 │   └─ Detailed technique, question templates, pitfalls → ./references/interview-playbook.md
 ├─ Continue or extend an earlier interview ........................ Resume → session notes, then Interview flow
 ├─ Walk through a recent feature or decision as evidence ......... Review a feature → playbook step 5
-├─ Change a stance, a definition or a flip condition ............. Amend → ./references/amendments.md
+├─ Change a stance, a definition or an exception ................ Amend → ./references/amendments.md
 ├─ Several maintainers' philosophies need to become one ......... Reconcile → ./references/reconciliation.md
 ├─ A new maintainer is joining ................................... Onboard → reconciliation.md, "Onboarding"
-├─ Propose or review a change in a project that has a philosophy  Use it → Decision cards below
+├─ Plan, build, propose or review a change against the philosophy  Use it → Decision cards below
 │   └─ Card format, proposal JSON, worked example → ./references/decision-cards.md
 └─ Understand or edit the data file .............................. ./references/data-model.md
 ```
@@ -80,8 +103,8 @@ The skill uses the open Agent Skills folder format (a `SKILL.md` with `reference
 which Claude Code, the claude.ai apps, OpenAI Codex and ChatGPT, GitHub Copilot, Cursor and Gemini CLI all load
 natively. No single folder is read by every host, so the recommended layout uses two locations:
 
-- the real folder at `.agents/skills/architectural-philosophy/` (read by Codex, Copilot, Cursor and Gemini CLI);
-- a symlink at `.claude/skills/architectural-philosophy` pointing to it (read by Claude Code, Copilot and
+- the real folder at `.agents/skills/philosophical-alignment/` (read by Codex, Copilot, Cursor and Gemini CLI);
+- a symlink at `.claude/skills/philosophical-alignment` pointing to it (read by Claude Code, Copilot and
   Cursor). On a checkout without symlink support (some Windows setups), copy the folder instead.
 - With the user's permission, a two-line pointer in `AGENTS.md` (and in `CLAUDE.md`, `GEMINI.md` or
   `.github/copilot-instructions.md` if the project uses them) naming the skill and its path, for hosts or
@@ -114,7 +137,7 @@ find it.
 
 ```
 docs/philosophy/
-├── philosophy.json          canonical data: glossary, hard limits, tensions, stances (edit this)
+├── philosophy.json          canonical data: glossary, hard limits, tensions (priorities), stances (edit this)
 ├── PHILOSOPHY.md            generated readable view; what agents read by default (do not hand-edit)
 ├── philosophy-map.html      generated interactive map; one self-contained file, opens from disk
 ├── AMENDMENTS.md            append-only amendment log, full entries
@@ -154,13 +177,13 @@ is produced by reconciliation.
    one without the user's yes. Record what was added in `interop.pointers`. A generic stanza:
 
 ```markdown
-## Architectural philosophy
-This project records its core trade-offs in `docs/philosophy/PHILOSOPHY.md` (tensions like T02, values like
-`correctness`, each with a definition). Before proposing or reviewing a change that touches one of those
-trade-offs, read the current file, check its hard limits, and include a decision card (format: the
-architectural-philosophy skill, or the "Decision cards" section of PHILOSOPHY.md). Use value words only in
-their defined sense. Strictness: advisory. If a stance no longer seems to fit, say so and suggest an
-amendment. Explicit instructions from the user take precedence.
+## Project philosophy (values and priorities)
+This project records its values and competing priorities in `docs/philosophy/PHILOSOPHY.md` (priorities like
+T02, values like `correctness`, each with a definition). Before planning, proposing or reviewing a change that
+touches one of those priorities, read the current file, check the lines it never crosses, and include a
+decision card (format: the philosophical-alignment skill). Use value words only in their defined sense.
+Strictness: advisory. If a stance no longer seems to fit, say so and suggest an amendment. Explicit
+instructions from the user take precedence.
 ```
 
 ## Interview flow at a glance
@@ -232,10 +255,11 @@ Any agent working in a project with a philosophy follows this contract (details 
 4. **Write a decision card** that opens with a 2-to-4-sentence **Bottom line** (what is proposed, the overall
    fit, the one decision needed), then: a one-sentence proposal ("In the context of ..., facing T02 Portability vs. raw speed, I
    propose X over Y, to gain ..., accepting ..."); each value cited by `id@rev` with its one-line definition
-   quoted at first mention; a table of touched tensions cited as `T02@1`, each with exactly one verdict
-   (Consistent, Departs, Flip condition met, with the condition quoted); options including doing nothing and
-   one option at the stance's preferred pole; precedents followed or departed from; and the one decision needed.
-5. **Skip the card** for mechanical or local changes, and say "No philosophy tensions touched."
+   quoted at first mention; a table of the priorities touched, cited as `T02@1`, each with exactly one verdict
+   (Consistent, Departs, or Allowed exception with the exception quoted; the JSON value for the last is
+   `flip_condition_met`); options including doing nothing and one option at the stance's preferred pole;
+   precedents followed or departed from; and the one decision needed.
+5. **Skip the card** for mechanical or local changes, and say "No priorities touched."
 6. **Contested tensions:** present the recorded positions and ask; never pick a side.
 7. **Permission to question:** if a stance no longer fits, say so and propose an amendment rather than
    contorting the proposal. Never edit the philosophy as a side effect of feature work.
@@ -287,6 +311,7 @@ that looks for a card in the pull request.
 | Starter tensions by project type; value palettes; stance forms | `./references/tension-library.md` |
 | Canvas widgets, specs, delivery ladder, result mapping, pitfalls | `./references/canvases.md` |
 | Decision card template, verdicts, proposal JSON, review use, rowfold example | `./references/decision-cards.md` |
+| Plain display labels on the generated pages; older `architectural-philosophy` schema labels | `./references/data-model.md` |
 | Team reconciliation: governance, alignment classes, rounds, decision rules | `./references/reconciliation.md` |
 | Endorsement levels, recording dissent, onboarding a new maintainer | `./references/reconciliation.md` |
 | Revisions, document versions, amendment log format, git practice | `./references/amendments.md` |

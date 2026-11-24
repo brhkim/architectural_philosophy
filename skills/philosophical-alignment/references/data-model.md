@@ -1,6 +1,6 @@
 # Data model: `philosophy.json`
 
-The canonical record of a project's architectural philosophy is one JSON file, `philosophy.json`. Everything
+The canonical record of a project's philosophy (its values and priorities) is one JSON file, `philosophy.json`. Everything
 else is generated from it (the readable `PHILOSOPHY.md` and the interactive map page) or sits beside it (the
 amendment log, governance notes, individual maintainers' files). This reference documents every field, says
 which fields are required, and gives an example for each tension shape.
@@ -62,12 +62,27 @@ Humans read the generated `PHILOSOPHY.md`; nobody should need to hand-edit JSON 
    forever, including after they are retired or superseded.
 8. **Additive evolution.** New optional fields may be added; existing fields are never renamed or removed
    within a major schema version. Readers ignore fields they do not know.
+9. **Field names are not display labels.** The generated pages and `PHILOSOPHY.md` show plain wording for
+   people; the JSON keeps its field names, and agents cite IDs exactly:
+
+   | Field or value | Shown as |
+   |----------------|----------|
+   | `hard_limits` | "Lines we never cross" |
+   | `tensions` | "Priorities" (each card still shows its ID, such as T02, in a quieter style) |
+   | `stance` | "Where we stand"; `firmness: "firm"` shows as "Firm position" |
+   | `flip_conditions` | "Exceptions we'd accept" |
+   | verdict `flip_condition_met` | "Allowed exception" |
+   | `status: "agreed"` / `"consented"` | "agreed by everyone" / "agreed, with concerns noted" |
+   | `positions[].endorsement` `"endorse"` / `"consent with concern"` | "agrees" / "agrees, with a concern" |
+   | `positions[].holder` | a capitalised first name: `maintainers[].name` when given, else the handle (`maya` → Maya) |
+   | `glossary_terms` | "Other terms", after the values glossary |
+   | proposal `overall` `"consistent"` / `"departs"` | "Fits your priorities" / "Departs from your priorities (explained)" |
 
 ## Top-level fields
 
 | Field | Required | Type | Meaning |
 |-------|----------|------|---------|
-| `schema` | yes | string | Schema identifier. v0.1 files use `"architectural-philosophy/0.1-draft"`. Readers accept any `architectural-philosophy/0.x` value. |
+| `schema` | yes | string | Schema identifier. v0.1 files use `"philosophical-alignment/0.1-draft"`. Readers accept any `philosophical-alignment/0.x` value, and also `architectural-philosophy/0.x`, the label written under the skill's earlier name: those files are read unchanged, so there is no need to edit them. |
 | `project` | yes | string | Project name as the maintainers write it. |
 | `version` | yes | string | Document version `MAJOR.MINOR.PATCH` (rules in `amendments.md`). |
 | `mission` | yes | string | One or two sentences: what the project is for. Everything else is read in light of this. |
@@ -101,7 +116,7 @@ Dates are ISO `YYYY-MM-DD` strings throughout.
     {"path": ".specify/memory/constitution.md", "kind": "spec-kit-constitution"}
   ],
   "pointers": [
-    {"file": "AGENTS.md", "section": "Architectural philosophy", "added": "2026-11-20", "approved_by": "maintainer-a"}
+    {"file": "AGENTS.md", "section": "Project philosophy (values and priorities)", "added": "2026-11-20", "approved_by": "maintainer-a"}
   ]
 }
 ```

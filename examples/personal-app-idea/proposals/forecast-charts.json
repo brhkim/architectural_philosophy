@@ -1,0 +1,26 @@
+{
+  "schema": "philosophical-alignment-proposal/0.1",
+  "title": "Spending forecast charts on the home screen",
+  "summary": "An AI assistant built spending forecast charts that predict the next three months of spending and balances, and placed them on the home screen for everyone. (Example project.)",
+  "bluf": "Spending forecast charts that predict the next three months, built and placed on the home screen for everyone. Forecasts are welcome, but the home screen is where first-time budgeters start, and Personal App Idea keeps advanced tools like this in the opt-in Advanced view. Decision needed: ask for a revision that moves the charts into the Advanced view?",
+  "overall": "departs",
+  "philosophy_version": "1.1.0",
+  "touched": [
+    {
+      "id": "T02",
+      "rev": 2,
+      "position": 0.4,
+      "verdict": "departs",
+      "reason": "The charts appear on the home screen for everyone. Advanced tools belong in the opt-in Advanced view until most people who use that view rely on them and first-time budgeters understand them without help, and neither has been tested."
+    },
+    {
+      "id": "T03",
+      "rev": 1,
+      "position": 0.45,
+      "verdict": "consistent",
+      "reason": "The forecast totals are checked against six months of test budgets before release, so the numbers are finished before they ship."
+    }
+  ],
+  "hard_limits_at_risk": [],
+  "decision_needed": "Ask for a revision that moves the charts into the Advanced view?"
+}

@@ -1,14 +1,15 @@
 <!doctype html>
 <!--
   §§ HEADER_DOC
-  canvas.html: interactive elicitation canvas for the "architectural-philosophy" skill.
+  canvas.html: interactive elicitation canvas for the "philosophical-alignment" skill.
   Zero dependencies: one file, vanilla JavaScript, inline SVG and CSS. Works from file://.
 
   HOW THE SPEC GETS IN
     scripts/canvas_server.py (or an agent by hand) replaces the contents of the JSON
     script block with id "canvas-spec" near the end of this file.
 
-  CANVAS SPEC (schema "architectural-philosophy-canvas/0.1")
+  CANVAS SPEC (schema "philosophical-alignment-canvas/0.1"; specs labelled with the skill's earlier
+  name, "architectural-philosophy-canvas/0.1", work unchanged: the page does not depend on the label)
     { "schema", "id", "title", "project", "intro", "respondent" (optional),
       "glossary": [ {id, name, rev, definition} ],          // definitions for every value used
       "widgets": [ ... ] }
@@ -24,7 +25,7 @@
       dilemma   { scenario, options: [{id, label, detail}], randomize: true }
       define    { value: v, neighbor: v }   the respondent explains a value in their own words.
 
-  RESULT (schema "architectural-philosophy-canvas-result/0.1")
+  RESULT (schema "philosophical-alignment-canvas-result/0.1")
     { schema, canvas_id, canvas_title, project, respondent, submitted_at, via,
       results: [ { widget, kind, tension_id, result, initial_state, adjustments,
                    seconds_spent, answered, firmness, reason, note,
@@ -195,7 +196,7 @@ details.quiet label { margin-top: 0.5rem; }
 
 <!-- §§ SPEC_BLOCK: replaced by canvas_server.py; an empty spec shows a short notice. -->
 <script type="application/json" id="canvas-spec">{
- "schema": "architectural-philosophy-canvas/0.1",
+ "schema": "philosophical-alignment-canvas/0.1",
  "id": "rowfold-demo-2026-11-20",
  "title": "rowfold (example package): where do you stand?",
  "project": "rowfold (example package)",
@@ -660,8 +661,8 @@ details.quiet label { margin-top: 0.5rem; }
     var node = el('<section class="w" id="w-' + esc(spec.id || i) + '" aria-labelledby="wh-' + i + '">' +
       '<h2 id="wh-' + i + '" class="w-prompt"><span class="w-num" aria-label="Question ' + (i + 1) + " of " + arr(SPEC.widgets).length + '">' + (i + 1) + "</span><span>" + esc(spec.prompt || (kind === "define" ? "Tell us what this word means to you" : "")) + "</span></h2>" +
       '<div class="w-body"></div><div class="w-foot">' +
-      (showFirm ? '<div class="seg" role="group" aria-label="How firm is this answer?"><span class="lbl">How firm is this answer?</span><button type="button" data-f="loose" aria-pressed="false">Loose</button><button type="button" data-f="firm" aria-pressed="false">Firm</button><button type="button" data-f="core" aria-pressed="false">Core</button></div>' +
-        '<label class="reason-box" hidden><span class="small"><strong>One line on why</strong> (required when firm or core)</span><input type="text" class="reason"></label>' : "") +
+      (showFirm ? '<div class="seg" role="group" aria-label="How strongly do you hold this answer?"><span class="lbl">How strongly do you hold this?</span><button type="button" data-f="loose" aria-pressed="false">Loosely</button><button type="button" data-f="firm" aria-pressed="false">Firmly</button><button type="button" data-f="core" aria-pressed="false">As a core principle</button></div>' +
+        '<label class="reason-box" hidden><span class="small"><strong>One line on why</strong> (needed when you hold it firmly or as a core principle)</span><input type="text" class="reason"></label>' : "") +
       '<details class="quiet"><summary>Add a note</summary><label><span class="small muted">Caveats, or anything this question could not capture</span><textarea class="note"></textarea></label></details><p class="w-error" role="alert"></p></div></section>');
     s.node = node;
     app.appendChild(node);
@@ -686,7 +687,7 @@ details.quiet label { margin-top: 0.5rem; }
   function collect(via) {
     var who = respondent(), ts = nowIso();
     return {
-      schema: "architectural-philosophy-canvas-result/0.1", canvas_id: SPEC.id || null, canvas_title: SPEC.title || null,
+      schema: "philosophical-alignment-canvas-result/0.1", canvas_id: SPEC.id || null, canvas_title: SPEC.title || null,
       project: SPEC.project || null, respondent: who, submitted_at: ts, via: via,
       results: W.map(function (s) {
         var fb = Object.keys(s.defFeedback).map(function (k) { return s.defFeedback[k]; });
@@ -702,7 +703,7 @@ details.quiet label { margin-top: 0.5rem; }
     var bad = [];
     W.forEach(function (s) {
       var msg = "";
-      if ((s.firmness === "firm" || s.firmness === "core") && !s.reason) msg = "Add one line on why this is " + (s.firmness === "core" ? "core" : "firm") + ".";
+      if ((s.firmness === "firm" || s.firmness === "core") && !s.reason) msg = "Add one line on why you hold this " + (s.firmness === "core" ? "as a core principle" : "firmly") + ".";
       if (s.spec.kind === "dilemma" && s.answered && !(s.result && s.result.would_flip_if)) msg = "Say what would make you pick the other option.";
       if (s.spec.kind === "spectrum" && s.result && s.result.choice === "depends" && !s.result.depends_on) msg = "Say what it depends on.";
       s.node.querySelector(".w-error").textContent = msg;
@@ -748,7 +749,7 @@ details.quiet label { margin-top: 0.5rem; }
     fetch("/result?t=" + encodeURIComponent(TOKEN), { method: "POST", headers: { "Content-Type": "application/json" }, body: json })
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (b) { if (!r.ok) throw new Error(b.error || "HTTP " + r.status); return b; }); })
       .then(function () {
-        app.innerHTML = '<div class="sent"><h1>Sent. Thank you.</h1><p class="intro">Your answers reached the interviewer. You can close this tab and return to the conversation.</p></div>';
+        app.innerHTML = '<div class="sent"><h1>Sent. Thank you.</h1><p class="intro">Your answers reached your AI assistant. You can close this tab and return to the conversation.</p></div>';
         showOut(JSON.stringify(JSON.parse(json), null, 2));
         bar.innerHTML = ""; window.scrollTo(0, 0);
       })
@@ -763,7 +764,7 @@ details.quiet label { margin-top: 0.5rem; }
   }
   function drawBar() {
     bar.innerHTML = '<span class="progress"><span id="prog"></span><br><span id="status" class="status" role="status"></span></span>' +
-      (SERVED ? '<button type="button" class="primary" id="send">Send to interviewer</button>' : "") +
+      (SERVED ? '<button type="button" class="primary" id="send">Send to your AI assistant</button>' : "") +
       '<button type="button" id="copy"' + (SERVED ? "" : ' class="primary"') + '>Copy answers</button><button type="button" id="dl">Download answers</button>';
     if (SERVED) document.getElementById("send").addEventListener("click", doSend);
     document.getElementById("copy").addEventListener("click", doCopy);
@@ -774,7 +775,7 @@ details.quiet label { margin-top: 0.5rem; }
   // §§ BOOT
   try { var t = (document.getElementById("canvas-spec").textContent || "").trim(); SPEC = t && t !== "null" ? JSON.parse(t) : null; }
   catch (e) { app.innerHTML = '<p class="err">The canvas spec could not be read: ' + esc(e.message) + "</p>"; return; }
-  if (!SPEC || !arr(SPEC.widgets).length) { app.innerHTML = '<h1>Philosophy canvas</h1><p class="intro">This canvas has no questions yet. The interviewer fills it in before sending it.</p>'; return; }
+  if (!SPEC || !arr(SPEC.widgets).length) { app.innerHTML = '<h1>Philosophy canvas</h1><p class="intro">This canvas has no questions yet. Your AI assistant fills them in before sending it to you.</p>'; return; }
   arr(SPEC.glossary).forEach(function (g) { if (g && g.id) { GL[g.id] = g; if (g.name) GLN[String(g.name).toLowerCase()] = g; } });
   document.title = SPEC.title ? SPEC.title : "Philosophy Canvas";
   var showProject = SPEC.project && String(SPEC.title || "").toLowerCase().indexOf(String(SPEC.project).toLowerCase()) < 0;

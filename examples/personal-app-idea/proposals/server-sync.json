@@ -1,0 +1,24 @@
+{
+  "schema": "philosophical-alignment-proposal/0.1",
+  "title": "Automatic bank sync through Personal App Idea's server",
+  "summary": "An AI assistant's first plan for bank sync: a bank-data service sends your transactions to Personal App Idea's server, which stores them unencrypted so it can sort them into categories, and first-time setup asks you to connect your bank. (Example project.)",
+  "bluf": "An AI assistant proposes bank sync that sends your transactions to Personal App Idea's server, stored unencrypted so the server can sort them into categories, with \"Connect your bank\" as a step in first-time setup. It would save typing, but it sends money data off your device unencrypted, which is the one line Personal App Idea never crosses, and it makes a cloud feature the default instead of a choice. Decision needed: send it back for the opt-in, end-to-end encrypted design?",
+  "overall": "needs_decision",
+  "philosophy_version": "1.1.0",
+  "touched": [
+    {
+      "id": "T01",
+      "rev": 1,
+      "position": 0.7,
+      "verdict": "departs",
+      "reason": "Transactions leave the device readable and sync is part of setup, so the welcome for cloud features (opt-in, end-to-end encrypted, manual entry stays the default) does not apply."
+    }
+  ],
+  "hard_limits_at_risk": [
+    {
+      "id": "H1",
+      "reason": "Every synced transaction would sit readable on Personal App Idea's server and with the bank-data service."
+    }
+  ],
+  "decision_needed": "Send it back for the opt-in, end-to-end encrypted design?"
+}

@@ -1,74 +1,92 @@
-# architectural-philosophy
+# Philosophical Alignment
 
-An agent skill that writes down how your project makes trade-offs, so that every agent working on it, yours
-and your contributors', can follow the same intent.
+**Your vision and judgment, carried through every step.**
 
-Development now moves at the speed of agents: maintainers' own pipelines and contributors'. Writing code is no
-longer the hard part. Keeping a project's intent consistent is. This skill interviews maintainers and records
-the project's trade-offs: defined values, the tensions between good things, where the project stands on each,
-the conditions under which a stance flips, hard limits, and precedents. Agents then read that record before
-they write code and attach a short, advisory decision card to each proposal. The philosophy evolves through
-logged amendments, and when maintainers disagree, the disagreement stays visible instead of being averaged
-away.
+Help your AI assistants work in line with your vision, core principles, priorities, expertise, taste, and judgment—at every step of a project.
 
-![A proposal review: an optional compiled parser for the example package rowfold, judged to fit the philosophy, with its bottom line, the one decision needed, and the first touched tension](docs/images/aligned-review.png)
+Whether you are building software, running research, making a game, working with data, or writing—alone, on a team, or in open source—a big project is full of hard decisions between good things. AI assistants move fast, so suggestions and edits pile up quickly, and you end up repeating the same directions and judgment on every change.
 
-## What it is
+Philosophical Alignment captures your values and priorities once, in plain files inside your project, and carries them through planning, building, review, and revision. The files it creates keep the name **philosophy** (`docs/philosophy/`, `PHILOSOPHY.md`, `philosophy.json`): the philosophy is what you write down; alignment is what you get. The aim: work from your AI assistants that lands closer to your vision from the start, and takes less of your time to review.
 
-A skill folder in the open Agent Skills format (a `SKILL.md` with `references/`, `assets/` and `scripts/`). It
-covers the whole lifecycle:
+<!-- Pitch video (2:36): add the GitHub upload link on the line below, in the web editor. -->
 
-**Establish.** The agent acts as a neutral facilitator. It interviews each maintainer in four styles: abstract
-discussion of values, a walkthrough of a real past decision, forced-choice scenarios, and checks for
-contradictions between answers. No value is weighed until the maintainer has explained it in their own words
-and confirmed a written definition. For questions that are easier to answer visually, such as placing a stance
-between three values, it can open a small browser canvas.
+![A proposal review for the example budgeting app Personal App Idea: automatic bank sync designed as opt-in and end-to-end encrypted, with manual entry kept as the default, showing that it fits your priorities, the bottom line, the decision needed, and the priorities it touches](docs/images/personal-app-idea-review.png)
 
-**Apply.** Any agent proposing or reviewing a change reads the philosophy, checks the hard limits, and writes
-a decision card that opens with a two-to-four sentence bottom line and cites the touched trade-offs by ID. It
-is advisory by default; a project can raise it to flag-and-ask or a review gate.
+## Where it fits in your work
 
-**Evolve.** Stances change through logged amendments, interviews resume across sessions, and several
-maintainers' philosophies are reconciled into a shared one in rounds that keep dissent on the record.
+Once your principles are written down, your AI assistants carry them through four phases:
 
-## What you get in your repository
+- **Planning.** Before choosing an approach, the AI assistant checks the plan against your priorities and picks the route that fits—or stops to ask if the work would cross a line you never cross.
+- **Building.** It builds the chosen route. On stricter settings, it stops before building anything that departs from where you stand.
+- **Review.** Each significant change arrives with a **decision card**: a short summary of which priorities it touched and how it handled each, so you can judge the work on vision and taste as well as the technical pieces.
+- **Revision.** Feedback can name the exact priority, so fixes stay targeted. When a principle itself no longer fits, the AI assistant proposes an update rather than quietly bending it.
 
-By default the skill writes to `docs/philosophy/`, after asking. It assumes no existing documentation system
-and does not touch your `AGENTS.md`, `CLAUDE.md` or similar files without your permission.
+## How it works
 
-```
+Philosophical Alignment is a **skill**—a small folder of plain instructions in the open Agent Skills format (`SKILL.md`, plus `references/`, `assets/`, and `scripts/`) that AI assistants can load. It covers the full lifecycle of your project's principles:
+
+**Capture your philosophy.** The AI assistant acts as a neutral facilitator and interviews you—or each person on your team—in four ways: open discussion of your values, a walkthrough of a real past decision, forced-choice scenarios, and checks for contradictions between your answers. No value is weighed until you explain it in your own words and confirm a written definition. For questions that are easier to answer visually, such as placing where you stand between three values, it can open a small canvas in your browser.
+
+**Apply it to every change.** Any AI assistant proposing or reviewing work reads the written philosophy, checks the lines you never cross, and attaches a decision card that opens with a two-to-four sentence bottom line and names each priority it touched. By default the AI assistant explains and proceeds; you can set it to stop and ask first, or to wait for your written approval.
+
+**Evolve it over time.** When your reviews and decisions reveal new or shifting priorities, the AI assistant proposes an update, and each approved update is logged with its reason. Interviews save as you go and resume across sessions, and teammates' individual philosophies are combined into a shared one in rounds that keep disagreements visible instead of averaging them away.
+
+## What you get in your project
+
+By default, the skill writes to `docs/philosophy/` after asking your permission. It assumes no existing documentation setup and does not touch `AGENTS.md`, `CLAUDE.md`, or similar files without your permission.
+
+```text
 docs/philosophy/
-├── philosophy.json          canonical data: glossary, hard limits, tensions, stances (edit this)
-├── PHILOSOPHY.md            generated readable view; what agents read by default
-├── philosophy-map.html      generated interactive map; one self-contained file, opens from disk
-├── AMENDMENTS.md            append-only amendment log
+├── philosophy.json          canonical data (edit this): glossary, hard_limits (lines you never cross),
+│                            tensions (competing priorities), stances (where you stand), and
+│                            flip_conditions (exceptions you'd accept)
+├── PHILOSOPHY.md            generated readable summary; what AI assistants read by default
+├── philosophy-map.html      generated interactive page; one self-contained file you open in a browser
+├── AMENDMENTS.md            append-only log of updates to your philosophy
 ├── GOVERNANCE.md            teams only: participants, decision rules, comment windows, strictness
-├── individuals/<handle>/    teams: each maintainer's own philosophy, session notes and canvases
+├── individuals/<handle>/    teams: each person's own philosophy, session notes, and canvases
 ├── reconciliation/          teams only: one folder per reconciliation cycle
-└── proposals/               optional: proposal files shown on the map
+└── proposals/               optional: proposal reviews shown on the interactive page
 ```
 
-A solo maintainer's answers go straight into `philosophy.json`. In a team, each person's answers go into their
-own file, and the shared file comes from reconciliation.
+If you work alone, your answers go straight into `philosophy.json`. On a team, each person's answers go into their own file first, and the shared file comes from reconciliation.
 
-![The map page for rowfold: each tension shows both values with their definitions and where the project stands, including a three-way trade-off drawn as a triangle](docs/images/philosophy-map.png)
+![The interactive philosophy page for Personal App Idea: the bottom line, the line it never crosses, and each competing priority with both values, their definitions and where the project stands](docs/images/personal-app-idea-map.png)
+
+## Examples
+
+Two examples live in `examples/` so you can see what the files and decision cards look like before trying it yourself.
+
+### Personal App Idea
+
+[`examples/personal-app-idea/`](examples/personal-app-idea/) is a fictional, simple personal budgeting app that keeps your money data on your device. One line it never crosses is that *unencrypted money data never leaves your device*. It contains the [philosophy data](examples/personal-app-idea/philosophy.json), its [readable summary](examples/personal-app-idea/PHILOSOPHY.md), the [interactive page](examples/personal-app-idea/philosophy-map.html), and an [interview canvas](examples/personal-app-idea/canvas-demo.html).
+
+Its showcase walks through a request for "automatic bank sync." Rather than sending financial data off the device in the clear, the [proposed approach](examples/personal-app-idea/proposals/encrypted-sync.html) offers opt-in, end-to-end encrypted sync while keeping manual entry as the default—accompanied by a decision card showing how it honored the project's values and priorities. Two more reviews show what happens otherwise: [sync through the app's own server](examples/personal-app-idea/proposals/server-sync.html) puts the line it never crosses at risk and asks for a decision, and [forecast charts on the home screen](examples/personal-app-idea/proposals/forecast-charts.html) depart from where the project stands on simplicity.
+
+### rowfold
+
+[`examples/rowfold/`](examples/rowfold/) is a fictional, small pure-Python library for reading tabular files that many projects depend on. It contains the [philosophy data](examples/rowfold/philosophy.json), its [readable summary](examples/rowfold/PHILOSOPHY.md), the [interactive page](examples/rowfold/philosophy-map.html), an [interview canvas](examples/rowfold/canvas-demo.html), and reviews of two competing proposals for a faster parser:
+
+- [Rewrite the core parser as a required C extension](examples/rowfold/proposals/required-c-extension.html) puts a line the project never crosses at risk ("installing rowfold never needs a compiler") and asks for a decision.
+- [Add an optional compiled parser](examples/rowfold/proposals/optional-fast-parser.html) fits the project's priorities. Its bottom line:
+
+> Add an optional compiled parser, installed with "pip install rowfold[fast]"; rowfold uses it when present and falls back to the pure-Python parser otherwise, and one shared test suite checks that both give identical output. This is the case the philosophy already welcomes, compiled code as an optional extra with an identical-results fallback, so plain installs and correctness are untouched. Decision needed: approve the optional [fast] extra?
+
+GitHub shows HTML files as source code; clone or download the repository and open them from disk in your browser.
 
 ## Install
 
-No single folder is read by every agent host, so the recommended layout uses two: the real folder at
-`.agents/skills/architectural-philosophy/`, and a symlink at `.claude/skills/architectural-philosophy` that
-points to it. From your project's root:
+No single folder is read by every AI assistant host, so the recommended setup uses two locations: the real folder at `.agents/skills/philosophical-alignment/`, and a symlink at `.claude/skills/philosophical-alignment` that points to it. From your project's root folder:
 
 ```bash
-git clone --depth 1 https://github.com/brhkim/architectural_philosophy.git .ap-tmp
+git clone --depth 1 https://github.com/brhkim/philosophical-alignment .pa-tmp
 mkdir -p .agents/skills .claude/skills
-cp -R .ap-tmp/skills/architectural-philosophy .agents/skills/
-ln -s ../../.agents/skills/architectural-philosophy .claude/skills/architectural-philosophy
-rm -rf .ap-tmp
+cp -R .pa-tmp/skills/philosophical-alignment .agents/skills/
+ln -s ../../.agents/skills/philosophical-alignment .claude/skills/philosophical-alignment
+rm -rf .pa-tmp
 ```
 
-On a checkout without symlink support (some Windows setups), copy the folder into `.claude/skills/` as well.
-Or copy it only into the one folder your host reads:
+On a checkout without symlink support (some Windows setups), copy the folder into `.claude/skills/` as well. Or copy it only into the single folder your host reads:
 
 | Host | Where the skill goes |
 |------|---------------------|
@@ -80,52 +98,25 @@ Or copy it only into the one folder your host reads:
 | claude.ai and Claude desktop chat | Turn on code execution, zip the folder, and upload it as a skill |
 | ChatGPT | Standalone skills are desktop-only; on the web, a skill must come inside a plugin |
 
-Host features change often; this table reflects a documentation review dated 2026-11-20. For hosts or
-sessions that do not load skills, the skill can add a two-line pointer to your `AGENTS.md` (or equivalent),
-with your permission.
+Host features change often; this table reflects a documentation review dated 2026-11-20. For hosts or sessions that do not load skills, the skill can add a two-line pointer to your `AGENTS.md` (or equivalent), with your permission.
 
 ## Quick start
 
-Ask your agent, in plain words:
+Ask your AI assistant, in plain words:
 
-- "Use the architectural-philosophy skill to interview me about this project's trade-offs."
+- "Use the philosophical-alignment skill to interview me about this project's values and priorities."
 - "Check this change against our philosophy and write a decision card."
-- "Amend our stance on T02."
+- "Update where we stand on privacy versus convenience."
 
-A first interview runs 30 to 60 minutes and covers three to five tensions. It saves after every tension, so
-you can stop and pick up later.
-
-## Example: rowfold
-
-[`examples/rowfold/`](examples/rowfold/) is a complete example for a fictional package, rowfold: a small,
-pure-Python library for reading tabular files that many projects depend on. It contains the
-[philosophy data](examples/rowfold/philosophy.json), its [readable view](examples/rowfold/PHILOSOPHY.md), the
-[map page](examples/rowfold/philosophy-map.html), an [interview canvas](examples/rowfold/canvas-demo.html), and
-two reviews of competing proposals for a faster parser:
-
-- [Rewrite the core parser as a required C extension](examples/rowfold/proposals/required-c-extension.html)
-  puts a hard limit at risk ("installing rowfold never needs a compiler") and asks for a decision.
-- [Add an optional compiled parser](examples/rowfold/proposals/optional-fast-parser.html) fits the
-  philosophy. Its bottom line:
-
-> Add an optional compiled parser, installed with "pip install rowfold[fast]"; rowfold uses it when present
-> and falls back to the pure-Python parser otherwise, and one shared test suite checks that both give
-> identical output. This is the case the philosophy already welcomes, compiled code as an optional extra with
-> an identical-results fallback, so plain installs and correctness are untouched. Decision needed: approve the
-> optional [fast] extra?
-
-GitHub shows HTML files as source; clone or download the repository and open them from disk in a browser.
+A first interview runs 30 to 60 minutes and covers three to five competing priorities. It saves after each one, so you can stop and pick up later.
 
 ## Requirements
 
-Plain files. Python 3's standard library is optional, for the two helper scripts: one renders `PHILOSOPHY.md`
-and the map page from the JSON, and one serves a canvas and collects the answers. Both have a no-Python
-fallback. No packages, no network, no build step.
+Plain files. Python 3's standard library is optional, for the two helper scripts: one renders `PHILOSOPHY.md` and `philosophy-map.html` from the JSON file, and one serves a browser canvas and collects the answers. Both have a no-Python fallback. No packages, no network, no build step.
 
 ## Status
 
-Prototype, v0.1, built for a hackathon on 2026-11-20. The data format is a draft and may change. Feedback is
-welcome through [issues](https://github.com/brhkim/architectural_philosophy/issues).
+Prototype, v0.2 (renamed from Architectural Philosophy on 2026-11-24; first built for a hackathon on 2026-11-20). The data format is a draft and may change. Whether this approach measurably improves AI assistants' work has not been tested yet. Feedback is welcome through [issues](https://github.com/brhkim/philosophical-alignment/issues).
 
 ## License
 

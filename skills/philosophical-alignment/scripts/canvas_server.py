@@ -10,7 +10,7 @@ It inlines SPEC.json into assets/canvas.html, serves the page, and prints one li
 
     CANVAS URL: http://localhost:PORT/?t=TOKEN
 
-for the person to open. When the person presses "Send to interviewer", the page POSTs
+for the person to open. When the person presses "Send to your AI assistant", the page POSTs
 its answers; the server checks the token and the request's Host and Origin, writes the
 answers to --out, prints
 
@@ -21,7 +21,11 @@ TIMEOUT line and exits 3, so an agent running it in the background is never left
 waiting forever. The person can always fall back to the page's Copy or Download buttons.
 
 Routes: GET / (the page), GET /ping (lets the page confirm it is served by this helper and
-show its "Send to interviewer" button), POST /result (one submission). All need the token.
+show its "Send to your AI assistant" button), POST /result (one submission). All need the token.
+
+Spec and result schema labels: "philosophical-alignment-canvas/0.1" and
+"philosophical-alignment-canvas-result/0.1". Specs labelled with the skill's earlier name
+("architectural-philosophy-canvas/0.1") are served unchanged; the server never checks the label.
 
 Security model (the page is a local, single-use form):
   * a random token is required on every request (query parameter t);

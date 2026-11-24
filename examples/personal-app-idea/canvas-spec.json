@@ -1,0 +1,99 @@
+{
+  "schema": "philosophical-alignment-canvas/0.1",
+  "id": "personal-app-idea-demo-2026-11-23",
+  "title": "Personal App Idea: where do you stand?",
+  "project": "Personal App Idea (example project)",
+  "intro": "Three short questions about how Personal App Idea, an example budgeting app, should weigh one good thing against another. Answer from how the app actually works today, not how you wish it did.",
+  "respondent": "",
+  "glossary": [
+    {
+      "id": "privacy",
+      "name": "Privacy",
+      "rev": 1,
+      "definition": "The degree to which your money data stays on your own device, readable only by you, unless you choose to send it somewhere in a form only you can unlock."
+    },
+    {
+      "id": "convenience",
+      "name": "Convenience",
+      "rev": 1,
+      "definition": "How little typing, setup and remembering it takes to keep your budget up to date."
+    },
+    {
+      "id": "simplicity",
+      "name": "Simplicity",
+      "rev": 1,
+      "definition": "How quickly a first-time budgeter can understand and use every screen they see by default, without help or a manual."
+    },
+    {
+      "id": "power",
+      "name": "Power",
+      "rev": 1,
+      "definition": "How much a person who wants depth can plan, analyse and customise their money in Personal App Idea without leaving it for a spreadsheet."
+    }
+  ],
+  "widgets": [
+    {
+      "id": "w1",
+      "kind": "spectrum",
+      "tension_id": "T01",
+      "prompt": "Where should Personal App Idea sit between privacy and convenience?",
+      "poles": [
+        {
+          "value": "Privacy",
+          "ref": "privacy"
+        },
+        {
+          "value": "Convenience",
+          "ref": "convenience"
+        }
+      ],
+      "steps": 7
+    },
+    {
+      "id": "w2",
+      "kind": "define",
+      "prompt": "When you say private, what do you mean?",
+      "value": {
+        "value": "Privacy",
+        "ref": "privacy"
+      },
+      "neighbor": {
+        "value": "Convenience",
+        "ref": "convenience"
+      },
+      "firmness": false
+    },
+    {
+      "id": "w3",
+      "kind": "dilemma",
+      "tension_id": "T02",
+      "prompt": "Forecasts for people who plan ahead",
+      "scenario": "Sam's prototype predicts the next three months of spending. People who plan ahead love it; in Maya's tests, first-time budgeters found the chart on the home screen confusing.",
+      "options": [
+        {
+          "id": "a",
+          "label": "Put the forecast on the home screen for everyone",
+          "detail": "Everyone sees it; new users meet a chart they may not understand.",
+          "leans_toward": "Power"
+        },
+        {
+          "id": "b",
+          "label": "Ship it in an opt-in Advanced view",
+          "detail": "The home screen stays as it is; people who want forecasts turn them on in Settings.",
+          "leans_toward": "Simplicity"
+        }
+      ],
+      "values": [
+        {
+          "value": "Simplicity",
+          "ref": "simplicity"
+        },
+        {
+          "value": "Power",
+          "ref": "power"
+        }
+      ],
+      "flip_prompt": "What would make you pick the other option?"
+    }
+  ]
+}

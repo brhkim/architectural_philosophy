@@ -1,8 +1,9 @@
 <!doctype html>
 <!--
   §§ HEADER_DOC
-  philosophy-map.html: interactive map of a project's architectural philosophy.
-  Part of the "architectural-philosophy" skill. Zero dependencies: one file,
+  philosophy-map.html: interactive map of a project's philosophy: its values,
+  its priorities and where it stands on each.
+  Part of the "philosophical-alignment" skill. Zero dependencies: one file,
   vanilla JavaScript, inline SVG and CSS. Works opened directly from disk.
 
   HOW DATA GETS IN
@@ -13,25 +14,37 @@
 
   WHAT THE PAGE SHOWS (visually calm; the bottom line comes first)
     Without a proposal: the synthesis ("Bottom line"), hard limits, tensions,
-    glossary, amendment history, in that order. Each tension shows its name, its
-    visual, its one-line stance and firmness; everything else sits behind one
-    "Details" disclosure. Value definitions stay visible next to the visual.
-    With a proposal: the page becomes a proposal review first (title, overall
-    verdict, BLUF, the decision needed, hard limits at risk, only the touched
-    tensions with stance and proposal on the same visual, one reason each), and
-    "Show the full philosophy" reveals everything else.
+    glossary, other terms, amendment history, in that order. Each tension shows
+    its name, its visual, its one-line stance and firmness; everything else sits
+    behind one "Details" disclosure. Value definitions stay visible next to the
+    visual. With a proposal: the page becomes a proposal review first (title,
+    overall verdict, BLUF, the decision needed, hard limits at risk, only the
+    touched tensions with stance and proposal on the same visual, one reason
+    each), and "Show the full philosophy" reveals everything else.
 
-  PHILOSOPHY JSON (schema "architectural-philosophy/0.x"), fields read here:
+  DISPLAY LABELS (plain words on screen; the data field names never change)
+    hard_limits      -> "Lines we never cross"
+    tensions         -> "Priorities"
+    stance           -> "Where we stand"; firmness "firm" -> "Firm position"
+    flip_conditions  -> "Exceptions we'd accept"
+    verdict flip_condition_met -> "Allowed exception"
+    status agreed / consented  -> "agreed by everyone" / "agreed, with concerns noted"
+    positions[].holder         -> a capitalised first name (maintainers[].name if given)
+    IDs such as T01 stay visible, in a quieter style, because agents cite them.
+
+  PHILOSOPHY JSON (schema "philosophical-alignment/0.x"; files labelled with the skill's
+  earlier name, "architectural-philosophy/0.x", are read the same way), fields read here:
     project, version, schema, mission, status_note, maintainers[{handle, role}],
     synthesis{text, as_of_version}   (the bottom line; stale when as_of_version != version),
     strictness ("advisory" | {level, by_firmness{}, by_tension{}, note}),
     hard_limits[{id, text, source}],
-    tensions[{id, rev, slug, kind, name, status, flip_conditions[], precedents[{title, note}],
+    tensions[{id, rev, slug, kind, name, status, flip_conditions[], precedents[{title, note, link}],
               amendments[{rev, date, summary}], positions[{holder, position|weights|priority,
               endorsement, note}], stance{summary, firmness, ...}}],
     amendment_log[{version, date, summary}],
     values[{id, name, rev, definition, looks_like[], too_little, not_to_be_confused_with,
-            in_own_words, examples{good, missing_or_faked}}]   (the values glossary).
+            in_own_words, examples{good, missing_or_faked}}]   (the values glossary),
+    glossary_terms[]   (other terms the philosophy relies on; same entry shape, shown as "Other terms").
     Poles and triad values carry "ref" (a glossary id); network tensions carry "refs"
     (parallel to "values"). A value with no glossary entry shows "no definition yet".
     kind "polarity": poles[2]{value, good, overdone}; stance.position in [-1, 1]
@@ -40,9 +53,10 @@
     kind "network":  values[] (strings or {value}); edges[{a, b, note}]; stance.priority[].
     Unknown kinds and unknown fields are shown as plain text, never dropped silently.
 
-  PROPOSAL JSON (overlay; schema "architectural-philosophy-proposal/0.1"):
+  PROPOSAL JSON (overlay; schema "philosophical-alignment-proposal/0.1", or the earlier
+  "architectural-philosophy-proposal/0.1"):
     {
-      "schema": "architectural-philosophy-proposal/0.1",
+      "schema": "philosophical-alignment-proposal/0.1",
       "title": "Short noun phrase naming the proposal",
       "summary": "One or two sentences.",
       "bluf": "2-4 sentences: what is proposed, how it fits overall, the one decision needed.",
@@ -168,6 +182,7 @@ section > h2 + p { margin-top: 0.3rem; }
 .t:first-of-type { margin-top: 1rem; }
 @media (min-width: 52em) { .t { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); } .t > details { grid-column: 1 / -1; } }
 .t-meta { color: var(--ink-2); font-size: var(--fs-s); margin-top: 0.3rem; }
+.tid { opacity: 0.7; font-size: 0.8rem; }
 .t-stance { margin-top: 0.7rem; max-width: 34rem; }
 .t-reason { margin-top: 0.7rem; }
 .t-reason .verdict { margin-right: 0.35rem; }
@@ -201,6 +216,8 @@ details.more[open] > summary { margin-bottom: 0.2rem; }
 .mk-label { position: absolute; white-space: nowrap; font-size: 0.78rem; font-weight: 600; left: 50%; transform: translateX(-50%); }
 .mk-label.above { bottom: 0.95rem; }
 .mk-label.below { top: 0.95rem; }
+.mk-label.below2 { top: 1.95rem; font-weight: 500; }
+.track.has-peers { height: 4.8rem; }
 .mk.edge-l .mk-label { left: -0.3rem; transform: none; }
 .mk.edge-r .mk-label { left: auto; right: -0.3rem; transform: none; }
 .mk.stance .mk-label { color: var(--accent); }
@@ -258,10 +275,10 @@ footer { margin-top: 1.5rem; font-size: var(--fs-s); color: var(--ink-2); }
 
 <!-- §§ DATA_BLOCKS: render.py replaces the contents of these two blocks. -->
 <script type="application/json" id="philosophy-data">{
- "schema": "architectural-philosophy/0.1-draft",
+ "schema": "philosophical-alignment/0.1-draft",
  "project": "rowfold (example package)",
  "version": "1.1.1",
- "status_note": "EXAMPLE PACKAGE. rowfold is fictional, invented for the architectural-philosophy demo on 2026-11-20 (the name was unregistered on PyPI that day). Its maintainers, releases, dates and quotes are illustrative, not a real project's record.",
+ "status_note": "EXAMPLE PACKAGE. rowfold is fictional, invented for the Philosophical Alignment demo on 2026-11-20 (the name was unregistered on PyPI that day). Its maintainers, releases, dates and quotes are illustrative, not a real project's record.",
  "mission": "Example package: rowfold is a small, pure-Python library for reading and transforming tabular files (CSV, TSV and fixed-width), and many downstream projects depend on it.",
  "project_types": [
   "library"
@@ -806,7 +823,7 @@ footer { margin-top: 1.5rem; font-size: var(--fs-s); color: var(--ink-2); }
  ]
 }</script>
 <script type="application/json" id="proposal-data">{
- "schema": "architectural-philosophy-proposal/0.1",
+ "schema": "philosophical-alignment-proposal/0.1",
  "title": "Optional compiled fast parser (rowfold[fast])",
  "summary": "Add an optional compiled parser, installed with \"pip install rowfold[fast]\", with the pure-Python parser as the fallback, and test both for identical output. (Example package.)",
  "bluf": "Add an optional compiled parser, installed with \"pip install rowfold[fast]\"; rowfold uses it when present and falls back to the pure-Python parser otherwise, and one shared test suite checks that both give identical output. This is the case the philosophy already welcomes, compiled code as an optional extra with an identical-results fallback, so plain installs and correctness are untouched. Decision needed: approve the optional [fast] extra?",
@@ -891,14 +908,28 @@ footer { margin-top: 1.5rem; font-size: var(--fs-s); color: var(--ink-2); }
     if (k.indexOf("flip") === 0) return "flip";
     return k ? "other" : "";
   }
-  var VERDICT_LABEL = { consistent: "Consistent", departs: "Departs", flip: "Flip condition met", other: "Unclassified" };
+  var VERDICT_LABEL = { consistent: "Consistent", departs: "Departs", flip: "Allowed exception", other: "Unclassified" };
   function verdictTag(v) {
     var k = verdictKey(v);
     if (!k) return "";
     return '<span class="verdict c-' + k + '"><span class="vdot" aria-hidden="true"></span>' + esc(k === "other" ? v : VERDICT_LABEL[k]) + "</span>";
   }
-  var FIRM_LABEL = { core: "Core stance", firm: "Firm stance", working: "Working stance", exploratory: "Exploratory stance", soft: "Soft stance", provisional: "Provisional stance", loose: "Loose stance" };
-  function initials(h) { return String(h || "?").replace(/[^A-Za-z0-9]+/g, " ").trim().split(" ").map(function (p) { return p[0]; }).join("").slice(0, 2).toUpperCase(); }
+  var FIRM_LABEL = { core: "Core position", firm: "Firm position", working: "Working position", exploratory: "Exploratory position", soft: "Soft position", provisional: "Provisional position", loose: "Loose position" };
+  var STATUS_LABEL = { provisional: "not yet confirmed", agreed: "agreed by everyone", consented: "agreed, with concerns noted", rough: "decided over an objection", scoped: "differs by area", contested: "not agreed yet", superseded: "replaced", retired: "retired" };
+  function statusLabel(s) { return STATUS_LABEL[String(s || "").toLowerCase()] || String(s || ""); }
+  var ENDORSE_LABEL = { "endorse": "agrees", "consent": "has no objection", "consent with concern": "agrees, with a concern", "stand aside": "stands aside", "in the rough": "still objects; the objection was heard", "object": "objects" };
+  function endorseLabel(e) { return ENDORSE_LABEL[String(e || "").toLowerCase().replace(/[_-]+/g, " ").trim()] || String(e || ""); }
+  var STRICT_NOTE = { "advisory": "the AI assistant explains and proceeds", "flag-and-ask": "the AI assistant stops and asks first", "review-gate": "changes wait for written approval" };
+  // Schema labels this page reads; "architectural-philosophy/" is the skill's earlier name.
+  var SCHEMA_PREFIXES = ["philosophical-alignment/", "architectural-philosophy/"];
+  function schemaKnown(s) { return !s || SCHEMA_PREFIXES.some(function (p) { return String(s).indexOf(p) === 0; }); }
+  // People are shown by a capitalised first name: maintainers[].name when given, else the handle.
+  function displayName(h, short) {
+    var m = arr(DATA && DATA.maintainers).filter(function (x) { return x && typeof x === "object" && x.handle === h; })[0];
+    if (m && m.name) return short ? String(m.name).trim().split(/\s+/)[0] : String(m.name);
+    return String(h || "?").split(/[-_.\s]+/).filter(Boolean).map(function (p) { return p.charAt(0).toUpperCase() + p.slice(1); }).join(" ");
+  }
+  function lowerFirst(x) { return x.charAt(0).toLowerCase() + x.slice(1); }
   function list(items) { return "<ul>" + items.map(function (x) { return "<li>" + x + "</li>"; }).join("") + "</ul>"; }
 
   // §§ GLOSSARY_HELPERS (every value shows its definition, keyed by ref)
@@ -942,7 +973,7 @@ footer { margin-top: 1.5rem; font-size: var(--fs-s); color: var(--ink-2); }
     return m;
   }
   // §§ OVERALL (given, or computed from the documented rules)
-  var OVERALL_LABEL = { consistent: "Fits the philosophy", departs: "Departs (explained)", needs_decision: "Needs your decision" };
+  var OVERALL_LABEL = { consistent: "Fits your priorities", departs: "Departs from your priorities (explained)", needs_decision: "Needs your decision" };
   var OVERALL_CLASS = { consistent: "consistent", departs: "departs", needs_decision: "needs_decision" };
   function strictFor(t) {
     var st = DATA && DATA.strictness; if (!st) return "advisory";
@@ -977,18 +1008,19 @@ footer { margin-top: 1.5rem; font-size: var(--fs-s); color: var(--ink-2); }
     if (poles.length < 2) return '<p class="err">Polarity tension needs two poles.</p>';
     var p = (t.stance || {}).position, peers = arr(t.positions).filter(function (m) { return num(m.position); });
     var html = '<div class="poles">' + valBlock(valName(poles[0]), refOf(poles[0])) + valBlock(valName(poles[1]), refOf(poles[1])) + "</div>";
-    var aria = "Spectrum from " + valName(poles[0]) + " to " + valName(poles[1]) + ". Project stance: " + (num(p) ? leanPhrase(p, poles) + " (" + signed(p) + ")" : "none recorded") + ".";
+    var aria = "Spectrum from " + valName(poles[0]) + " to " + valName(poles[1]) + ". Where we stand: " + (num(p) ? leanPhrase(p, poles) + " (" + signed(p) + ")" : "none recorded") + ".";
     if (prop && num(prop.position)) aria += " Proposal: " + leanPhrase(prop.position, poles) + " (" + signed(prop.position) + ").";
-    html += '<div class="track" role="img" aria-label="' + esc(aria) + '"><span class="line"></span><span class="mid"></span>';
+    html += '<div class="track' + (peers.length > 1 ? " has-peers" : "") + '" role="img" aria-label="' + esc(aria) + '"><span class="line"></span><span class="mid"></span>';
     if (peers.length > 1) peers.forEach(function (m) {
-      html += '<span class="mk" style="left:' + markerPos(m.position) + '%" title="' + esc(m.holder) + ": " + signed(m.position) + '"><span class="peer"></span><span class="mk-label below peer-label">' + esc(initials(m.holder)) + '</span></span>';
+      var mx = markerPos(m.position);
+      html += '<span class="mk' + edgeClass(mx) + '" style="left:' + mx + '%" title="' + esc(displayName(m.holder)) + ": " + esc(leanPhrase(m.position, poles)) + '"><span class="peer"></span><span class="mk-label below2 peer-label">' + esc(displayName(m.holder, true)) + '</span></span>';
     });
     var vk = prop ? verdictKey(prop.verdict) : "";
     if (prop && num(prop.position) && num(p)) {
       var a = markerPos(p), b = markerPos(prop.position);
       html += '<span class="arrow c-' + vk + '" style="left:' + Math.min(a, b) + "%;width:" + Math.abs(b - a) + '%"></span>';
     }
-    if (num(p)) { var sx = markerPos(p); html += '<span class="mk stance' + edgeClass(sx) + '" style="left:' + sx + '%"><span class="dot"></span><span class="mk-label above">' + (prop ? "Stance" : "") + "</span></span>"; }
+    if (num(p)) { var sx = markerPos(p); html += '<span class="mk stance' + edgeClass(sx) + '" style="left:' + sx + '%"><span class="dot"></span><span class="mk-label above">' + (prop ? "Where we stand" : "") + "</span></span>"; }
     if (prop && num(prop.position)) { var px = markerPos(prop.position); html += '<span class="mk c-' + vk + edgeClass(px) + '" style="left:' + px + '%"><span class="diamond"></span><span class="mk-label below">Proposal</span></span>'; }
     html += "</div>";
     html += '<p class="lean">' + esc(num(p) ? leanPhrase(p, poles) : "No stance position recorded") + "</p>";
@@ -1006,19 +1038,19 @@ footer { margin-top: 1.5rem; font-size: var(--fs-s); color: var(--ink-2); }
     var peers = arr(t.positions).map(function (m) { return { m: m, w: getWeights(m, values) }; }).filter(function (o) { return o.w; });
     var pw = prop ? getWeights(prop, values) : null, vk = prop ? verdictKey(prop.verdict) : "";
     var s = '<svg class="figure" viewBox="0 0 320 300" role="img" aria-labelledby="' + IDP + 'tri-' + esc(t.id) + '"><title id="' + IDP + 'tri-' + esc(t.id) + '">' +
-      esc("Triangle of " + names.join(", ") + (w ? ". Stance: " + names.map(function (n, i) { return n + " " + pct(w[i]); }).join(", ") : "") + (pw ? ". Proposal: " + names.map(function (n, i) { return n + " " + pct(pw[i]); }).join(", ") : "")) + "</title>";
+      esc("Triangle of " + names.join(", ") + (w ? ". Where we stand: " + names.map(function (n, i) { return n + " " + pct(w[i]); }).join(", ") : "") + (pw ? ". Proposal: " + names.map(function (n, i) { return n + " " + pct(pw[i]); }).join(", ") : "")) + "</title>";
     s += '<polygon points="' + TV.map(function (v) { return v.join(","); }).join(" ") + '" fill="none" stroke="var(--line)" stroke-width="2"/>';
     var lab = [[160, 16, "middle"], [22, 284, "start"], [298, 284, "end"]];
     names.forEach(function (n, i) { s += '<text x="' + lab[i][0] + '" y="' + lab[i][1] + '" text-anchor="' + lab[i][2] + '" font-size="15" font-weight="600">' + esc(n) + "</text>"; });
     if (peers.length > 1) peers.forEach(function (o) {
       var q = bary(o.w);
-      s += '<g><title>' + esc(o.m.holder) + "</title><circle cx=\"" + q[0].toFixed(1) + '" cy="' + q[1].toFixed(1) + '" r="5" fill="var(--bg)" stroke="var(--ink-2)" stroke-width="1.5"/><text x="' + (q[0] + 9).toFixed(1) + '" y="' + (q[1] + 4).toFixed(1) + '" font-size="11" style="fill:var(--ink-2)">' + esc(initials(o.m.holder)) + "</text></g>";
+      s += '<g><title>' + esc(displayName(o.m.holder)) + "</title><circle cx=\"" + q[0].toFixed(1) + '" cy="' + q[1].toFixed(1) + '" r="5" fill="var(--bg)" stroke="var(--ink-2)" stroke-width="1.5"/><text x="' + (q[0] + 9).toFixed(1) + '" y="' + (q[1] + 4).toFixed(1) + '" font-size="11" style="fill:var(--ink-2)">' + esc(displayName(o.m.holder, true)) + "</text></g>";
     });
     if (w && pw) { var q1 = bary(w), q2 = bary(pw); s += '<line x1="' + q1[0] + '" y1="' + q1[1] + '" x2="' + q2[0] + '" y2="' + q2[1] + '" stroke="currentColor" stroke-dasharray="4 3" stroke-width="2" class="c-' + vk + '"/>'; }
     if (w) { var q = bary(w); s += '<circle cx="' + q[0] + '" cy="' + q[1] + '" r="8" fill="var(--accent)" stroke="var(--bg)" stroke-width="3"/>'; }
     if (pw) { var r = bary(pw); s += '<rect x="' + (r[0] - 6) + '" y="' + (r[1] - 6) + '" width="12" height="12" transform="rotate(45 ' + r[0] + " " + r[1] + ')" fill="var(--bg)" stroke="currentColor" stroke-width="2" class="c-' + vk + '"/>'; }
     s += "</svg>";
-    var key = '<p class="keyline"><span><i></i>Stance</span>' + (pw ? '<span class="c-' + vk + '"><i class="dia"></i><span style="color:var(--ink-2)">Proposal</span></span>' : "") + (peers.length > 1 ? "<span><i class=\"peer\"></i>Each maintainer, kept separate</span>" : "") + "</p>";
+    var key = '<p class="keyline"><span><i></i>Where we stand</span>' + (pw ? '<span class="c-' + vk + '"><i class="dia"></i><span style="color:var(--ink-2)">Proposal</span></span>' : "") + (peers.length > 1 ? "<span><i class=\"peer\"></i>Each maintainer, kept separate</span>" : "") + "</p>";
     var vl = '<ul class="vlist">' + values.map(function (v, i) {
       return '<li><div class="val">' + term(valName(v), refOf(v)) + (w ? '<span class="share">' + pct(w[i]) + (pw ? " → " + pct(pw[i]) : "") + "</span>" : "") + defLine(valName(v), refOf(v)) + "</div></li>";
     }).join("") + "</ul>";
@@ -1079,30 +1111,31 @@ footer { margin-top: 1.5rem; font-size: var(--fs-s); color: var(--ink-2); }
   }
   function renderDetails(t, prop, review) {
     var st = t.stance || {}, h = "";
-    if (review && st.summary) h += "<div><h4>The project's stance</h4><p>" + esc(st.summary) + "</p></div>";
-    if (prop && (prop.flip_condition || prop.note)) h += "<div><h4>About this proposal</h4>" + (prop.flip_condition ? "<p>Flip condition cited: “" + esc(prop.flip_condition) + "”</p>" : "") + (prop.note ? "<p>" + esc(prop.note) + "</p>" : "") + "</div>";
+    if (review && st.summary) h += "<div><h4>Where we stand</h4><p>" + esc(st.summary) + "</p></div>";
+    if (prop && (prop.flip_condition || prop.note)) h += "<div><h4>About this proposal</h4>" + (prop.flip_condition ? "<p>Exception cited: “" + esc(prop.flip_condition) + "”</p>" : "") + (prop.note ? "<p>" + esc(prop.note) + "</p>" : "") + "</div>";
     var flips = arr(t.flip_conditions);
-    h += "<div><h4>What would flip the stance</h4>" + (flips.length ? list(flips.map(function (f) { return esc(typeof f === "string" ? f : f.text || JSON.stringify(f)); })) : '<p class="muted">Nothing recorded: the stance holds in every case named so far.</p>') + "</div>";
+    h += "<div><h4>Exceptions we’d accept</h4>" + (flips.length ? list(flips.map(function (f) { return esc(typeof f === "string" ? f : f.text || JSON.stringify(f)); })) : '<p class="muted">None recorded: this position holds in every case named so far.</p>') + "</div>";
     var precs = arr(t.precedents);
     if (precs.length) h += "<div><h4>Precedents</h4>" + list(precs.map(function (p) {
       if (typeof p === "string") return esc(p);
-      var title = p.url ? '<a href="' + esc(p.url) + '">' + esc(p.title || p.url) + "</a>" : esc(p.title || p.id || "");
+      var href = p.link || p.url; // "link" is the schema field; "url" is read too
+      var title = href ? '<a href="' + esc(href) + '">' + esc(p.title || href) + "</a>" : esc(p.title || p.id || "");
       return "<strong>" + title + "</strong>" + (p.note ? ": " + esc(p.note) : "");
     })) + "</div>";
     h += goodsHTML(t);
     var pos = arr(t.positions);
     if (pos.length) {
       h += "<div><h4>Maintainer positions (kept separate, never averaged)</h4>" + list(pos.map(function (m) {
-        var bits = [];
-        if (num(m.position)) bits.push(signed(m.position));
+        var bits = [], poles = arr(t.poles);
+        if (num(m.position)) bits.push(t.kind === "polarity" && poles.length > 1 ? esc(lowerFirst(leanPhrase(m.position, poles))) : signed(m.position));
         if (Array.isArray(m.priority)) bits.push(m.priority.map(esc).join(" › "));
-        if (m.endorsement) bits.push(esc(m.endorsement));
-        return "<strong>" + esc(m.holder) + "</strong>" + (bits.length ? ": " + bits.join(", ") : "") + (m.note ? ". " + esc(m.note) : "");
+        if (m.endorsement) bits.push(esc(endorseLabel(m.endorsement)));
+        return "<strong>" + esc(displayName(m.holder)) + "</strong>" + (bits.length ? ": " + bits.join("; ") : "") + (m.note ? ". " + esc(m.note) : "");
       }));
       if (t.kind === "triad") {
         var values = arr(t.values), w = getWeights(t.stance, values), rows = pos.map(function (m) { return { m: m, w: getWeights(m, values) }; }).filter(function (o) { return o.w; });
         if (rows.length) {
-          h += '<div class="table-scroll"><table class="wt"><thead><tr><th>Value</th>' + (w ? "<th>Stance</th>" : "") + rows.map(function (o) { return "<th>" + esc(o.m.holder) + "</th>"; }).join("") + "</tr></thead><tbody>";
+          h += '<div class="table-scroll"><table class="wt"><thead><tr><th>Value</th>' + (w ? "<th>Where we stand</th>" : "") + rows.map(function (o) { return "<th>" + esc(displayName(o.m.holder)) + "</th>"; }).join("") + "</tr></thead><tbody>";
           values.forEach(function (v, i) { h += "<tr><td>" + esc(valName(v)) + "</td>" + (w ? "<td>" + pct(w[i]) + "</td>" : "") + rows.map(function (o) { return "<td>" + pct(o.w[i]) + "</td>"; }).join("") + "</tr>"; });
           h += "</tbody></table></div>";
         }
@@ -1121,7 +1154,7 @@ footer { margin-top: 1.5rem; font-size: var(--fs-s); color: var(--ink-2); }
   function renderCard(t, prop, review) {
     var st = t.stance || {};
     var visual = t.kind === "polarity" ? renderPolarity(t, prop) : t.kind === "triad" ? renderTriad(t, prop) : t.kind === "network" ? renderNetwork(t, prop) : '<p class="muted">Kind “' + esc(t.kind) + '” has no dedicated view yet; its fields are under Details.</p>';
-    var meta = [FIRM_LABEL[st.firmness] || (st.firmness ? esc(st.firmness) : ""), t.status ? esc(t.status) : "", esc(t.id || "") + (t.rev != null ? ", revision " + esc(t.rev) : "")].filter(Boolean).join(" · ");
+    var meta = [FIRM_LABEL[st.firmness] || (st.firmness ? esc(st.firmness) + " position" : ""), t.status ? esc(statusLabel(t.status)) : "", t.id ? '<span class="tid">' + esc(t.id) + (t.rev != null ? ", revision " + esc(t.rev) : "") + "</span>" : ""].filter(Boolean).join(" · ");
     var h = '<article class="t" id="' + IDP + esc(t.id) + '" data-search="' + esc(JSON.stringify(t).toLowerCase()) + '"><div>';
     h += "<h3>" + esc(t.name || t.slug || t.id) + "</h3>";
     h += '<p class="t-meta">' + meta + "</p>";
@@ -1135,16 +1168,17 @@ footer { margin-top: 1.5rem; font-size: var(--fs-s); color: var(--ink-2); }
   function headerHTML(d) {
     var h = '<header class="top"><div><h1>' + esc(d.project || "Untitled project") + "</h1>";
     if (d.mission) h += '<p class="mission">' + esc(d.mission) + "</p>";
-    var bits = ["Architectural philosophy" + (d.version ? ", version " + esc(d.version) : "")];
-    if (arr(d.maintainers).length) bits.push("Maintainers: " + arr(d.maintainers).map(function (m) { return '<span title="' + esc(m.role || "") + '">' + esc(m.handle || m.name || m) + "</span>"; }).join(", "));
+    var bits = ["Philosophy" + (d.version ? ", version " + esc(d.version) : "")];
+    if (arr(d.maintainers).length) bits.push("Maintainers: " + arr(d.maintainers).map(function (m) { return '<span title="' + esc(m.role || "") + '">' + esc(typeof m === "object" ? (m.name || displayName(m.handle)) : displayName(m)) + "</span>"; }).join(", "));
     if (d.strictness) {
-      var st = typeof d.strictness === "string" ? { level: d.strictness } : d.strictness, raised = [];
-      Object.keys(st.by_firmness || {}).forEach(function (k) { raised.push(k + " stances: " + st.by_firmness[k]); });
+      var st = typeof d.strictness === "string" ? { level: d.strictness } : d.strictness, raised = [], lvl = st.level || "advisory";
+      Object.keys(st.by_firmness || {}).forEach(function (k) { raised.push(k + " positions: " + st.by_firmness[k]); });
       Object.keys(st.by_tension || {}).forEach(function (k) { raised.push(k + ": " + st.by_tension[k]); });
-      bits.push('<span title="' + esc(st.note || "") + '">Strictness: ' + esc(st.level || "advisory") + (raised.length ? " (raised for " + esc(raised.join("; ")) + ")" : "") + "</span>");
+      bits.push('<span title="' + esc(st.note || "") + '">Strictness: ' + esc(lvl) + (STRICT_NOTE[lvl] ? " (" + STRICT_NOTE[lvl] + ")" : "") + (raised.length ? "; raised for " + esc(raised.join("; ")) : "") + "</span>");
     }
     h += '<p class="meta">' + bits.join(" · ") + "</p>";
     if (d.status_note) h += '<p class="status">' + esc(d.status_note) + "</p>";
+    if (!schemaKnown(d.schema)) h += '<p class="warnline">This file’s schema label, “' + esc(d.schema) + '”, is not one this page knows, so some parts may not show.</p>';
     return h + "</div>" + themeBtn() + "</header>";
   }
   function synthesisHTML(d) {
@@ -1152,13 +1186,13 @@ footer { margin-top: 1.5rem; font-size: var(--fs-s); color: var(--ink-2); }
     if (s && s.text) {
       h += '<p class="lead">' + esc(s.text) + "</p>";
       if (s.as_of_version && d.version && s.as_of_version !== d.version) h += '<p class="warnline">Written for version ' + esc(s.as_of_version) + "; the philosophy is now version " + esc(d.version) + ", so this summary may be out of date.</p>";
-    } else h += '<p class="muted">No synthesis yet. The agent drafts one after the first interview and the maintainers confirm it.</p>';
+    } else h += '<p class="muted">No synthesis yet. Your AI assistant drafts one after the first interview, and the maintainers confirm it.</p>';
     return h + "</section>";
   }
   function limitsHTML(d, onlyRisk) {
     var risk = limitsAtRisk(), limits = arr(d.hard_limits).filter(function (l) { return !onlyRisk || risk[l.id]; });
     if (!limits.length) return "";
-    var h = '<section aria-labelledby="hl' + (onlyRisk ? "r" : "") + '"><h2 id="hl' + (onlyRisk ? "r" : "") + '">' + (onlyRisk ? "Hard limit" + (limits.length > 1 ? "s" : "") + " at risk" : "Hard limits") + "</h2>";
+    var h = '<section aria-labelledby="hl' + (onlyRisk ? "r" : "") + '"><h2 id="hl' + (onlyRisk ? "r" : "") + '">' + (onlyRisk ? (limits.length > 1 ? "Lines we never cross are at risk" : "A line we never cross is at risk") : "Lines we never cross") + "</h2>";
     if (!onlyRisk) h += '<p class="muted small">Never traded against anything. Crossing one needs a change to the philosophy itself.</p>';
     h += '<ol class="limits">' + limits.map(function (l) {
       var r = risk[l.id];
@@ -1170,47 +1204,66 @@ footer { margin-top: 1.5rem; font-size: var(--fs-s); color: var(--ink-2); }
   }
   function tensionsHTML(d) {
     var tensions = arr(d.tensions), touched = touchedMap();
-    var h = '<section aria-labelledby="tn"><div class="t-head"><h2 id="tn">Tensions</h2><label class="sr-only" for="q">Search tensions</label><input type="search" id="q" placeholder="Search tensions" value="' + esc(state.q) + '"></div>';
+    var h = '<section aria-labelledby="tn"><div class="t-head"><h2 id="tn">Priorities</h2><label class="sr-only" for="q">Search priorities</label><input type="search" id="q" placeholder="Search priorities" value="' + esc(state.q) + '"></div>';
     h += '<p class="muted small">Each one names two or more good things that pull against each other, and where this project stands.</p>';
     h += tensions.map(function (t) { return renderCard(t, touched[t.id], false); }).join("");
-    h += '<p class="muted" id="nomatch" hidden>No tensions match.</p>';
+    h += '<p class="muted" id="nomatch" hidden>No priorities match.</p>';
     return h + "</section>";
   }
   function glossaryHTML(d) {
     var vals = arr(d.values);
     if (!vals.length) return "";
-    var h = '<section aria-labelledby="vg"><h2 id="vg">Glossary</h2><p class="muted small">What each value means in this project. Every tension uses these meanings.</p><div class="gl-grid">';
+    var h = '<section aria-labelledby="vg"><h2 id="vg">Glossary</h2><p class="muted small">What each value means in this project. Every priority uses these meanings.</p><div class="gl-grid">';
     vals.forEach(function (v) {
       if (!v) return;
-      var more = "";
-      if (arr(v.looks_like).length) more += "<dt>Looks like</dt><dd><ul>" + arr(v.looks_like).map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul></dd>";
-      if (v.too_little) more += "<dt>Too little looks like</dt><dd>" + esc(v.too_little) + "</dd>";
-      if (v.not_to_be_confused_with) more += "<dt>Not to be confused with</dt><dd>" + esc(v.not_to_be_confused_with) + "</dd>";
-      more += "<dt>In the maintainer's own words</dt><dd>" + (v.in_own_words ? "<blockquote>" + esc(v.in_own_words) + "</blockquote>" : '<span class="def none">Not yet captured.</span>') + "</dd>";
-      var ex = v.examples || {};
-      if (ex.good) more += "<dt>Done well</dt><dd>" + esc(ex.good) + "</dd>";
-      if (ex.missing_or_faked) more += "<dt>Missing or faked</dt><dd>" + esc(ex.missing_or_faked) + "</dd>";
-      Object.keys(v).forEach(function (k) {
-        if (["id", "name", "rev", "definition", "looks_like", "too_little", "not_to_be_confused_with", "in_own_words", "examples"].indexOf(k) < 0 && v[k] != null && v[k] !== "")
-          more += "<dt>" + esc(k.replace(/_/g, " ")) + "</dt><dd>" + esc(typeof v[k] === "object" ? JSON.stringify(v[k]) : v[k]) + "</dd>";
-      });
-      more += "<dt>Revision</dt><dd>" + esc(v.id) + ", revision " + esc(v.rev != null ? v.rev : 1) + "</dd>";
+      var more = glMore(v, true);
       h += '<article class="gl" id="v-' + esc(v.id) + '"><h3>' + esc(v.name || v.id) + "</h3>" + (v.definition ? "<p>" + esc(v.definition) + "</p>" : '<p class="def none">No definition yet.</p>') +
         "<details><summary>Examples and the maintainer's words</summary><dl>" + more + "</dl></details></article>";
     });
     return h + "</div></section>";
   }
+  function termsHTML(d) {
+    var terms = arr(d.glossary_terms).filter(function (g) { return g && (g.id || g.name); });
+    if (!terms.length) return "";
+    var h = '<section aria-labelledby="ot"><h2 id="ot">Other terms</h2><p class="muted small">Words the philosophy relies on that are not values, and what they mean here.</p><div class="gl-grid">';
+    terms.forEach(function (g) {
+      var more = glMore(g, false), gid = g.id || String(g.name).toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      h += '<article class="gl" id="g-' + esc(gid) + '"><h3>' + esc(g.name || g.id) + "</h3>" + (g.definition ? "<p>" + esc(g.definition) + "</p>" : '<p class="def none">No definition yet.</p>') +
+        (more ? "<details><summary>More about this term</summary><dl>" + more + "</dl></details>" : "") + "</article>";
+    });
+    return h + "</div></section>";
+  }
+  // The detail list shared by values and other terms. Values always show the maintainer's-words line
+  // and their revision; terms show only the fields they have.
+  function glMore(v, isValue) {
+    var more = "";
+    if (arr(v.looks_like).length) more += "<dt>Looks like</dt><dd><ul>" + arr(v.looks_like).map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul></dd>";
+    if (v.too_little) more += "<dt>Too little looks like</dt><dd>" + esc(v.too_little) + "</dd>";
+    if (v.not_to_be_confused_with) more += "<dt>Not to be confused with</dt><dd>" + esc(v.not_to_be_confused_with) + "</dd>";
+    if (isValue || v.in_own_words) more += "<dt>In the maintainer's own words</dt><dd>" + (v.in_own_words ? "<blockquote>" + esc(v.in_own_words) + "</blockquote>" : '<span class="def none">Not yet captured.</span>') + "</dd>";
+    var ex = v.examples || {};
+    if (arr(ex.good).length) more += "<dt>Done well</dt><dd>" + exList(ex.good) + "</dd>";
+    if (arr(ex.missing_or_faked).length) more += "<dt>Missing or faked</dt><dd>" + exList(ex.missing_or_faked) + "</dd>";
+    Object.keys(v).forEach(function (k) {
+      if (["id", "name", "rev", "definition", "looks_like", "too_little", "not_to_be_confused_with", "in_own_words", "examples"].indexOf(k) < 0 && v[k] != null && v[k] !== "")
+        more += "<dt>" + esc(k.replace(/_/g, " ")) + "</dt><dd>" + esc(typeof v[k] === "object" ? JSON.stringify(v[k]) : v[k]) + "</dd>";
+    });
+    if (isValue) more += "<dt>Revision</dt><dd>" + esc(v.id) + ", revision " + esc(v.rev != null ? v.rev : 1) + "</dd>";
+    return more;
+  }
+  // Examples may be one string or a list of strings.
+  function exList(x) { var a = arr(x).map(function (e) { return esc(typeof e === "string" ? e : JSON.stringify(e)); }); return a.length > 1 ? "<ul>" + a.map(function (e) { return "<li>" + e + "</li>"; }).join("") + "</ul>" : a[0] || ""; }
   function logHTML(d) {
     var tlog = [];
     arr(d.tensions).forEach(function (t) { arr(t.amendments).forEach(function (a) { tlog.push({ date: a.date, label: (t.name || t.id) + ", revision " + a.rev, summary: a.summary }); }); });
     arr(d.amendment_log).forEach(function (a) { tlog.push({ date: a.date, label: a.version ? "Version " + a.version : (a.id || ""), summary: a.summary }); });
     tlog.sort(function (a, b) { return String(b.date || "").localeCompare(String(a.date || "")); });
     if (!tlog.length) return "";
-    return '<section aria-labelledby="al"><h2 id="al">Amendment history</h2><ol class="log">' + tlog.map(function (a) {
+    return '<section aria-labelledby="al"><h2 id="al">Update history</h2><ol class="log">' + tlog.map(function (a) {
       return '<li><span class="when">' + esc(a.label) + (a.date ? ", " + esc(a.date) : "") + "</span>" + esc(a.summary || "") + "</li>";
     }).join("") + "</ol></section>";
   }
-  function philosophyHTML(d) { return synthesisHTML(d) + limitsHTML(d, false) + tensionsHTML(d) + glossaryHTML(d) + logHTML(d); }
+  function philosophyHTML(d) { return synthesisHTML(d) + limitsHTML(d, false) + tensionsHTML(d) + glossaryHTML(d) + termsHTML(d) + logHTML(d); }
 
   // §§ RENDER_REVIEW (a proposal turns the page into a review first)
   function reviewHTML(d) {
@@ -1222,13 +1275,15 @@ footer { margin-top: 1.5rem; font-size: var(--fs-s); color: var(--ink-2); }
     if (P.decision_needed) h += '<div class="decision' + (ov.key === "needs_decision" ? "" : " calm") + '" role="note" aria-labelledby="dn"><h2 id="dn">Decision needed</h2><p class="q">' + esc(P.decision_needed) + "</p></div>";
     if (P.philosophy_version && d.version && P.philosophy_version !== d.version) h += '<p class="warnline" style="margin-top:1rem">Checked against version ' + esc(P.philosophy_version) + "; the philosophy is now version " + esc(d.version) + ".</p>";
     var unknown = arr(P.touched).filter(function (t) { return !tensions.some(function (x) { return x.id === t.id; }); });
-    if (unknown.length) h += '<p class="err">This proposal names tensions the philosophy does not have: ' + unknown.map(function (t) { return esc(t.id); }).join(", ") + "</p>";
+    if (unknown.length) h += '<p class="err">This proposal names priorities the philosophy does not have: ' + unknown.map(function (t) { return esc(t.id); }).join(", ") + "</p>";
     h += limitsHTML(d, true);
     var shown = tensions.filter(function (t) { return touched[t.id]; });
     var counts = {}; shown.forEach(function (t) { var k = verdictKey(touched[t.id].verdict); counts[k] = (counts[k] || 0) + 1; });
-    var tally = ["departs", "flip", "consistent", "other"].filter(function (k) { return counts[k]; }).map(function (k) { return counts[k] + " " + (k === "flip" ? "meet a flip condition" : k === "other" ? "unclassified" : k); }).join(", ");
+    // bug 2: singular and plural phrases ("1 departs", "2 are consistent", "1 is an allowed exception")
+    var PHRASE = { departs: ["departs", "depart"], flip: ["is an allowed exception", "are allowed exceptions"], consistent: ["is consistent", "are consistent"], other: ["is unclassified", "are unclassified"] };
+    var tally = ["departs", "flip", "consistent", "other"].filter(function (k) { return counts[k]; }).map(function (k) { return counts[k] + " " + PHRASE[k][counts[k] === 1 ? 0 : 1]; }).join(", ");
     var rest = tensions.length - shown.length;
-    h += '<section aria-labelledby="tt"><h2 id="tt">Tensions this proposal touches</h2><p class="muted small">' + esc(tally) + (rest ? ". " + rest + " other tension" + (rest > 1 ? "s are" : " is") + " untouched." : ".") + "</p>";
+    h += '<section aria-labelledby="tt"><h2 id="tt">Priorities this change touches</h2><p class="muted small">' + esc(tally) + (tally ? "." : "") + (rest ? " " + rest + " other priorit" + (rest > 1 ? "ies are" : "y is") + " untouched." : "") + "</p>";
     IDP = "r-"; h += shown.map(function (t) { return renderCard(t, touched[t.id], true); }).join("") + "</section>"; IDP = "";
     if (P.bluf && P.summary) h += '<p class="muted small" style="margin-top:2rem">As submitted: ' + esc(P.summary) + "</p>";
     return h;
@@ -1261,7 +1316,7 @@ footer { margin-top: 1.5rem; font-size: var(--fs-s); color: var(--ink-2); }
       h += '<div id="fullwrap"' + (state.showFull ? "" : " hidden") + ">" + headerHTML(d).replace(/<button type="button" id="theme"[^]*?<\/button>/, "").replace('<header class="top">', '<header class="top" style="margin-top:3rem">') + philosophyHTML(d) + "</div>";
     } else h += headerHTML(d) + philosophyHTML(d);
     h += loaderHTML(false);
-    h += "<footer>Made with the architectural-philosophy skill" + (d.schema ? " (" + esc(d.schema) + ")" : "") + ". A spectrum position runs from −1, fully toward the first value, to +1, fully toward the second.</footer>";
+    h += "<footer>Made with the philosophical-alignment skill.</footer>";
     app.innerHTML = h;
     wire(); filter();
   }

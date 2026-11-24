@@ -84,7 +84,7 @@ the top of `assets/canvas.html`; if this reference and the template ever disagre
 
 ```json
 {
-  "schema": "architectural-philosophy-canvas/0.1",
+  "schema": "philosophical-alignment-canvas/0.1",
   "id": "2026-05-20_maintainer-a_session2",
   "title": "Where does rowfold stand?",
   "project": "rowfold (example package)",
@@ -219,7 +219,7 @@ python3 <skill-dir>/scripts/canvas_server.py SPEC.json --out RESULT.json \
 
 1. **Start it in the background** and wait for it to exit. It prints one line, `CANVAS URL:
    http://localhost:PORT/?t=TOKEN`; hand that URL to the maintainer and ask them to confirm it opened.
-2. The maintainer fills the canvas and presses "Send to interviewer". The server checks the one-time token and
+2. The maintainer fills the canvas and presses "Send to your AI assistant". The server checks the one-time token and
    the request's origin, accepts exactly one submission, writes `RESULT.json`, prints `RESULT: <path>`, and
    exits with code 0.
 3. When the background process exits, read the result file and continue.
@@ -287,20 +287,21 @@ position), with `"via": "text"` noted in the session notes.
 
 Pasted text can be truncated, edited, or from an older canvas. Before recording anything:
 
-1. Confirm it parses as one JSON object whose `schema` is `architectural-philosophy-canvas-result/0.1` (or a
-   later 0.x version).
+1. Confirm it parses as one JSON object whose `schema` is `philosophical-alignment-canvas-result/0.1` (or a
+   later 0.x version; `architectural-philosophy-canvas-result/0.1`, from canvases made under the skill's
+   earlier name, is the same format).
 2. Confirm `canvas_id` matches the spec you sent and `respondent` is the person you are interviewing.
 3. Confirm each `results[].widget` matches a widget in the spec, and note any widget with `answered: false`.
 4. If any check fails, say what is wrong and ask the maintainer to copy again. Never guess at missing values.
 
 ## The result JSON
 
-Every submission has the same envelope (schema `architectural-philosophy-canvas-result/0.1`; the exact list is
+Every submission has the same envelope (schema `philosophical-alignment-canvas-result/0.1`; the exact list is
 in the template's header):
 
 ```json
 {
-  "schema": "architectural-philosophy-canvas-result/0.1",
+  "schema": "philosophical-alignment-canvas-result/0.1",
   "canvas_id": "2026-05-20_maintainer-a_session2", "canvas_title": "Where does rowfold stand?",
   "project": "rowfold (example package)", "respondent": "maintainer-a", "submitted_at": "2026-05-20T15:02:11Z", "via": "server",
   "results": [

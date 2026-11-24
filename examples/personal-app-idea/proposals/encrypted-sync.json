@@ -1,0 +1,27 @@
+{
+  "schema": "philosophical-alignment-proposal/0.1",
+  "title": "Automatic bank sync, opt-in and encrypted",
+  "summary": "An AI assistant proposes automatic bank sync that stays off until you turn it on in Settings. Your device downloads new transactions straight from your bank; when your phone and laptop share them, they travel end-to-end encrypted, and manual entry stays the default. (Example project.)",
+  "bluf": "Automatic bank sync that stays off until you turn it on. Your device downloads transactions straight from your bank, and anything shared between your devices is end-to-end encrypted; manual entry stays the default. This fits your priorities and keeps unencrypted money data on your device. Decision needed: approve opt-in, encrypted bank sync?",
+  "overall": "consistent",
+  "philosophy_version": "1.1.0",
+  "touched": [
+    {
+      "id": "T01",
+      "rev": 1,
+      "position": -0.2,
+      "verdict": "flip_condition_met",
+      "flip_condition": "Cloud features are welcome when they are opt-in and end-to-end encrypted, and manual entry stays the default.",
+      "reason": "Sync is opt-in, everything that leaves the device is end-to-end encrypted first, and manual entry and file import stay the default for everyone who never turns it on."
+    },
+    {
+      "id": "T02",
+      "rev": 2,
+      "position": -0.4,
+      "verdict": "consistent",
+      "reason": "Sync is one switch in Settings; the home screen and the add-transaction form do not change."
+    }
+  ],
+  "hard_limits_at_risk": [],
+  "decision_needed": "Approve opt-in, encrypted bank sync?"
+}

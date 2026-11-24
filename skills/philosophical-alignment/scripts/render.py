@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render an architectural-philosophy JSON file to an HTML map and a Markdown view.
+"""Render a philosophical-alignment philosophy JSON file to an HTML map and a Markdown view.
 
 Python 3 standard library only. Usage:
 
@@ -11,6 +11,12 @@ opened straight from disk. Both outputs open with the bottom line: the philosoph
 `synthesis`, and with --proposal, the proposal review (its `bluf`, overall verdict and the
 decision needed) ahead of everything else. Exit codes: 0 ok, 1 validation error, 2 usage or
 I/O error.
+
+Display labels are plain words (hard_limits are "Lines we never cross", tensions are
+"Priorities", a stance is "Where we stand", flip_conditions are "Exceptions we'd accept", the
+flip_condition_met verdict is "Allowed exception"); the data field names do not change. Files
+labelled with the skill's earlier schema name, "architectural-philosophy/0.x", are read exactly
+like "philosophical-alignment/0.x" files.
 """
 # §§ IMPORTS
 import argparse
@@ -22,8 +28,32 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 TEMPLATE = HERE.parent / "assets" / "philosophy-map.html"
 KNOWN_KINDS = {"polarity", "triad", "network"}
-OVERALL_LABEL = {"consistent": "Fits the philosophy", "departs": "Departs (explained)",
+OVERALL_LABEL = {"consistent": "Fits your priorities", "departs": "Departs from your priorities (explained)",
                  "needs_decision": "Needs your decision"}
+# Schema labels this renderer reads. "architectural-philosophy" is the skill's earlier name; files
+# written under it are accepted unchanged.
+SCHEMA_FAMILIES = ("philosophical-alignment", "architectural-philosophy")
+VERDICT_LABEL = {"consistent": "consistent", "departs": "departs", "flip": "allowed exception"}
+FIRM_LABEL = {"core": "Core position", "firm": "Firm position", "working": "Working position",
+              "exploratory": "Exploratory position", "soft": "Soft position",
+              "provisional": "Provisional position", "loose": "Loose position"}
+STATUS_LABEL = {"provisional": "not yet confirmed", "agreed": "agreed by everyone",
+                "consented": "agreed, with concerns noted", "rough": "decided over an objection",
+                "scoped": "differs by area", "contested": "not agreed yet", "superseded": "replaced",
+                "retired": "retired"}
+ENDORSE_LABEL = {"endorse": "agrees", "consent": "has no objection", "consent with concern": "agrees, with a concern",
+                 "stand aside": "stands aside", "in the rough": "still objects; the objection was heard",
+                 "object": "objects"}
+STRICT_NOTE = {"advisory": "the AI assistant explains and proceeds",
+               "flag-and-ask": "the AI assistant stops and asks first",
+               "review-gate": "changes wait for written approval"}
+
+
+def schema_known(label, suffix=""):
+    """True when label is missing or belongs to one of SCHEMA_FAMILIES (suffix: "", "-proposal", ...)."""
+    if not label:
+        return True
+    return any(str(label).startswith(f"{fam}{suffix}/") for fam in SCHEMA_FAMILIES)
 
 
 # §§ VALIDATION
@@ -34,6 +64,8 @@ def validate(doc):
         return ["top level must be a JSON object"], warnings
     if not doc.get("project"):
         errors.append("missing 'project' (the project's name)")
+    if not schema_known(doc.get("schema")):
+        warnings.append(f"schema {doc.get('schema')!r} is not a philosophical-alignment/0.x label; rendering it anyway")
     tensions = doc.get("tensions")
     if not isinstance(tensions, list):
         errors.append("missing 'tensions' list")
@@ -108,6 +140,8 @@ def validate_proposal(prop, doc):
     ids = {t.get("id") for t in doc.get("tensions") or [] if isinstance(t, dict)}
     if not prop.get("bluf"):
         warnings.append("proposal has no 'bluf' (bottom line up front); its summary is shown instead")
+    if not schema_known(prop.get("schema"), "-proposal"):
+        warnings.append(f"proposal schema {prop.get('schema')!r} is not a philosophical-alignment-proposal/0.x label")
     if prop.get("overall") is not None and prop.get("overall") not in OVERALL_LABEL:
         warnings.append(f"proposal 'overall' should be one of {', '.join(OVERALL_LABEL)}; found {prop.get('overall')!r}")
     for t in prop["touched"]:
@@ -138,6 +172,27 @@ def value_refs(t):
         for i, v in enumerate(t.get("values") or []):
             ref = v.get("ref") if isinstance(v, dict) else None
             yield value_name(v), ref or (refs[i] if i < len(refs) else None)
+
+
+def plain(label_map, key):
+    """Plain display wording for a data keyword; unknown keywords pass through unchanged."""
+    k = re.sub(r"[_-]+", " ", str(key or "")).strip().lower()
+    return label_map.get(k) or label_map.get(str(key or "").lower()) or str(key or "")
+
+
+def display_name(handle, doc=None):
+    """A person as shown to readers: maintainers[].name when given, else the handle, capitalised."""
+    for m in (doc or {}).get("maintainers") or []:
+        if isinstance(m, dict) and m.get("handle") == handle and m.get("name"):
+            return str(m["name"])
+    return " ".join(p[:1].upper() + p[1:] for p in re.split(r"[-_.\s]+", str(handle or "?")) if p)
+
+
+def as_list(x):
+    """Examples may be one string or a list of strings (bug fix: lists printed as Python syntax)."""
+    if x is None or x == "":
+        return []
+    return [str(e) for e in x] if isinstance(x, list) else [str(x)]
 
 
 def script_json(obj):
@@ -171,11 +226,13 @@ def strictness_lines(st):
     """Readable strictness: the default level, then any raised levels as a short list."""
     if not st:
         return []
-    out = [f"**Strictness:** {strictness_level(st)} by default."]
+    lvl0 = strictness_level(st)
+    note = f" ({STRICT_NOTE[lvl0]})" if lvl0 in STRICT_NOTE else ""
+    out = [f"**Strictness:** {lvl0} by default{note}."]
     if isinstance(st, dict):
         extra = []
         for firm, lvl in (st.get("by_firmness") or {}).items():
-            extra.append(f"- {firm} stances: {lvl}")
+            extra.append(f"- {firm} positions: {lvl}")
         for tid, lvl in (st.get("by_tension") or {}).items():
             extra.append(f"- {tid}: {lvl}")
         for k, v in st.items():
@@ -252,19 +309,21 @@ def proposal_markdown(prop, doc):
     limits = {h.get("id"): h for h in doc.get("hard_limits") or [] if isinstance(h, dict)}
     risks = [h if isinstance(h, dict) else {"id": h} for h in prop.get("hard_limits_at_risk") or []]
     if risks:
-        out += ["**Hard limits at risk:**", ""]
+        out += ["**Lines we never cross that are at risk:**" if len(risks) > 1 else "**A line we never cross is at risk:**", ""]
         for r in risks:
             text = md_escape((limits.get(r.get("id")) or {}).get("text"))
             out.append(f"- **{r.get('id')}** {text}" + (f" *At risk because:* {md_escape(r['reason'])}" if r.get("reason") else ""))
         out.append("")
     by_id = {t.get("id"): t for t in doc.get("tensions") or [] if isinstance(t, dict)}
-    label = {"consistent": "consistent", "departs": "departs", "flip": "flip condition met"}
     if prop.get("touched"):
-        out += ["**Tensions touched:**", ""]
+        out += ["**Priorities this change touches:**", ""]
         for p in prop["touched"]:
             t = by_id.get(p.get("id")) or {}
-            out.append(f"- **{md_escape(t.get('name') or p.get('id'))}** ({p.get('id')}): "
-                       f"{label.get(verdict_key(p.get('verdict')), p.get('verdict') or 'no verdict')}. {md_escape(p.get('reason'))}")
+            verdict = VERDICT_LABEL.get(verdict_key(p.get("verdict")), p.get("verdict") or "no verdict")
+            line = f"- **{md_escape(t.get('name') or p.get('id'))}** (`{p.get('id')}`): {verdict.capitalize()}. {md_escape(p.get('reason'))}"
+            if p.get("flip_condition"):
+                line += f" *Exception cited:* \u201c{md_escape(p['flip_condition'])}\u201d"
+            out.append(line)
         out.append("")
     if prop.get("bluf") and prop.get("summary"):
         out += [f"*As submitted:* {md_escape(prop['summary'])}", ""]
@@ -291,7 +350,7 @@ def to_markdown(doc, prop=None):
             return f"{name}: *no definition yet.*"
         return f"`{g['id']}@{g.get('rev', 1)}` {md_escape(g.get('definition')) or '*(definition missing)*'}"
 
-    out = [f"# {md_escape(doc.get('project'))}: architectural philosophy", ""]
+    out = [f"# {md_escape(doc.get('project'))}: philosophy", ""]
     if prop:
         out += proposal_markdown(prop, doc)
     out += ["## Philosophy bottom line" if prop else "## Bottom line", ""]
@@ -302,7 +361,7 @@ def to_markdown(doc, prop=None):
             out += [f"*Written for version {syn['as_of_version']}; the philosophy is now version {doc['version']}, "
                     "so this summary may be out of date.*", ""]
     else:
-        out += ["*No synthesis yet. The agent drafts one after the first interview and the maintainers confirm it.*", ""]
+        out += ["*No synthesis yet. Your AI assistant drafts one after the first interview, and the maintainers confirm it.*", ""]
     meta = []
     if doc.get("version"):
         meta.append(f"Version {doc['version']}")
@@ -310,6 +369,8 @@ def to_markdown(doc, prop=None):
         meta.append(f"schema `{doc['schema']}`")
     if doc.get("strictness"):
         meta.append(f"strictness: {strictness_level(doc['strictness'])}")
+    if not schema_known(doc.get("schema")):
+        meta.append("*(schema label not recognised; shown as best it can be)*")
     if meta:
         out += [" · ".join(meta), ""]
     if doc.get("status_note"):
@@ -319,18 +380,18 @@ def to_markdown(doc, prop=None):
         out += [f"**Mission.** {md_escape(doc['mission'])}", ""]
     if doc.get("maintainers"):
         out.append("**Maintainers.** " + "; ".join(
-            f"{m.get('handle', m) if isinstance(m, dict) else m}"
+            f"{display_name(m.get('handle'), doc) if isinstance(m, dict) else display_name(m)}"
             + (f" ({m['role']})" if isinstance(m, dict) and m.get("role") else "")
             for m in doc["maintainers"]))
         out.append("")
 
-    out += ["## Hard limits", "", "Not traded against anything. Crossing one needs a change to the philosophy itself.", ""]
+    out += ["## Lines we never cross", "", "Never traded against anything. Crossing one needs a change to the philosophy itself.", ""]
     for h in doc.get("hard_limits") or []:
         src = f" *(Source: {md_escape(h.get('source'))})*" if h.get("source") else ""
         out.append(f"- **{h.get('id')}**: {md_escape(h.get('text'))}{src}")
     out.append("")
 
-    out += ["## Glossary", "", "What each value means in this project. Tensions below link here.", ""]
+    out += ["## Glossary", "", "What each value means in this project. The priorities below link here.", ""]
     if not gl:
         out += ["*No values glossary yet.*", ""]
     for g in gl.values():
@@ -346,28 +407,39 @@ def to_markdown(doc, prop=None):
         out.append("- **In the maintainer's own words:** " + (
             f"\"{md_escape(g['in_own_words'])}\"" if g.get("in_own_words") else "*not yet captured*"))
         ex = g.get("examples") or {}
-        if ex.get("good"):
-            out.append(f"- **Done well:** {md_escape(ex['good'])}")
-        if ex.get("missing_or_faked"):
-            out.append(f"- **Missing or faked:** {md_escape(ex['missing_or_faked'])}")
+        if as_list(ex.get("good")):
+            out.append("- **Done well:** " + "; ".join(md_escape(x) for x in as_list(ex.get("good"))))
+        if as_list(ex.get("missing_or_faked")):
+            out.append("- **Missing or faked:** " + "; ".join(md_escape(x) for x in as_list(ex.get("missing_or_faked"))))
         out.append("")
 
-    out += ["## Tensions", ""]
+    # bug 3: glossary_terms (other terms the philosophy relies on) were never rendered
+    terms = [g for g in doc.get("glossary_terms") or [] if isinstance(g, dict) and (g.get("id") or g.get("name"))]
+    if terms:
+        out += ["### Other terms", "", "Words the philosophy relies on that are not values, and what they mean here.", ""]
+        for g in terms:
+            tid = g.get("id") or re.sub(r"[^a-z0-9]+", "-", str(g.get("name")).lower())
+            out.append(f'- <a id="term-{tid}"></a>**{md_escape(g.get("name") or tid)}** (`{tid}@{g.get("rev", 1)}`): '
+                       f'{md_escape(g.get("definition")) or "*no definition yet*"}')
+        out.append("")
+
+    out += ["## Priorities", "", "Each one names two or more good things that pull against each other, and where this project stands.", ""]
     for t in doc.get("tensions") or []:
         st = t.get("stance") or {}
         rev = f"@{t['rev']}" if t.get("rev") is not None else ""
-        out += [f"### {t.get('id')}{rev} {md_escape(t.get('name') or t.get('slug'))}", ""]
-        facts = [f"Kind: {t.get('kind')}"]
+        out += [f"### {md_escape(t.get('name') or t.get('slug') or t.get('id'))} (`{t.get('id')}{rev}`)", ""]
+        facts = []
         if st.get("firmness"):
-            facts.append(f"firmness: {st['firmness']}")
+            facts.append(FIRM_LABEL.get(st["firmness"], f"{st['firmness']} position"))
         if t.get("status"):
-            facts.append(f"status: {t['status']}")
-        out += [" · ".join(facts), ""]
+            facts.append(plain(STATUS_LABEL, t["status"]))
+        if facts:
+            out += [" · ".join(facts), ""]
         kind = t.get("kind")
         if kind == "polarity":
             poles = t.get("poles") or [{}, {}]
             names = [value_name(p) for p in poles]
-            out.append(f"**Poles:** {term(names[0], poles[0].get('ref'))} (−1) ↔ {term(names[1], poles[1].get('ref'))} (+1)")
+            out.append(f"**Between:** {term(names[0], poles[0].get('ref'))} (−1) ↔ {term(names[1], poles[1].get('ref'))} (+1)")
             out.append("")
             for p in poles:
                 n = value_name(p)
@@ -377,7 +449,7 @@ def to_markdown(doc, prop=None):
                 if p.get("overdone"):
                     out.append(f"  - Overdone: {md_escape(p['overdone'])}")
             pos = st.get("position")
-            out += ["", f"**Stance:** position {fmt_pos(pos)}, {lean_phrase(pos, names[0], names[-1])}."]
+            out += ["", f"**Where we stand:** {lean_phrase(pos, names[0], names[-1])} ({fmt_pos(pos)})."]
         elif kind in ("triad", "network"):
             pairs = list(value_refs(t))
             out.append("**Values:**")
@@ -389,18 +461,18 @@ def to_markdown(doc, prop=None):
             out.append("")
             refmap = dict(pairs)
             if kind == "triad" and isinstance(st.get("weights"), dict):
-                out.append("**Stance:** " + ", ".join(
+                out.append("**Where we stand:** " + ", ".join(
                     f"{term(k, refmap.get(k))} {round(v * 100)}%" for k, v in st["weights"].items()) + ".")
             if kind == "network":
                 if st.get("priority"):
-                    out.append("**Stance (priority):** " + " > ".join(term(v, refmap.get(v)) for v in st["priority"]) + ".")
+                    out.append("**Where we stand (in order):** " + " > ".join(term(v, refmap.get(v)) for v in st["priority"]) + ".")
                 for e in t.get("edges") or []:
                     out.append(f"- {term(e.get('a'), refmap.get(e.get('a')))} ↔ {term(e.get('b'), refmap.get(e.get('b')))}: {md_escape(e.get('note'))}")
         else:
             out.append(f"*Kind {kind!r} shown as raw data:* `{json.dumps({k: v for k, v in t.items() if k not in ('id', 'rev', 'name', 'stance')}, ensure_ascii=False)[:400]}`")
         if st.get("summary"):
             out += ["", f"> {md_escape(st['summary'])}"]
-        out += ["", "**Flip conditions:**"]
+        out += ["", "**Exceptions we'd accept:**"]
         flips = t.get("flip_conditions") or []
         out += [f"- {md_escape(f if isinstance(f, str) else f.get('text', f))}" for f in flips] or ["- None recorded."]
         if t.get("precedents"):
@@ -409,21 +481,25 @@ def to_markdown(doc, prop=None):
                 if isinstance(p, str):
                     out.append(f"- {md_escape(p)}")
                 else:
-                    title = f"[{p.get('title')}]({p['url']})" if p.get("url") else p.get("title", "")
+                    href = p.get("link") or p.get("url")  # "link" is the schema field; "url" is read too
+                    title = f"[{p.get('title') or href}]({href})" if href else p.get("title", "")
                     out.append(f"- **{title}**" + (f": {md_escape(p.get('note'))}" if p.get("note") else ""))
         if t.get("positions"):
             out += ["", "**Maintainer positions** (kept separate, never averaged):"]
             for m in t["positions"]:
                 bits = []
                 if "position" in m:
-                    bits.append(f"position {fmt_pos(m['position'])}")
+                    if kind == "polarity":
+                        bits.append(f"{lean_phrase(m['position'], names[0], names[-1])} ({fmt_pos(m['position'])})")
+                    else:
+                        bits.append(f"position {fmt_pos(m['position'])}")
                 if isinstance(m.get("weights"), dict):
                     bits.append(", ".join(f"{k} {round(v * 100)}%" for k, v in m["weights"].items()))
                 if m.get("priority"):
                     bits.append(" > ".join(m["priority"]))
                 if m.get("endorsement"):
-                    bits.append(m["endorsement"])
-                line = f"- **{m.get('holder')}**: " + "; ".join(bits)
+                    bits.append(plain(ENDORSE_LABEL, m["endorsement"]))
+                line = f"- **{display_name(m.get('holder'), doc)}**: " + "; ".join(bits)
                 if m.get("note"):
                     line += f". {md_escape(m['note'])}"
                 out.append(line)
@@ -433,7 +509,7 @@ def to_markdown(doc, prop=None):
                 out.append(f"- {t.get('id')}@{a.get('rev')} ({a.get('date', '')}): {md_escape(a.get('summary'))}")
         out.append("")
 
-    out += ["## Amendment log", ""]
+    out += ["## Update history", ""]
     log = doc.get("amendment_log") or []
     out += [f"- **{a.get('version') or a.get('id', '')}** ({a.get('date', '')}): {md_escape(a.get('summary'))}" for a in log] or ["*Empty.*"]
     out.append("")

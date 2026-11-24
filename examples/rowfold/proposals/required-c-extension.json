@@ -1,5 +1,5 @@
 {
-  "schema": "architectural-philosophy-proposal/0.1",
+  "schema": "philosophical-alignment-proposal/0.1",
   "title": "Rewrite the core parser as a required C extension",
   "summary": "A contributor's agent proposes rewriting rowfold's core parser in C, as a required compiled extension, for about ten times the speed on large files. (Example package.)",
   "bluf": "A contributor's agent proposes replacing rowfold's pure-Python parser with a required C extension for about ten times the speed. The speed is welcome, but making compiled code mandatory goes against the portability-first stance and breaks the promise that installing rowfold never needs a compiler. Decision needed: ask the contributor to reshape it as an optional extra with a pure-Python fallback?",

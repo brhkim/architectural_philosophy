@@ -1,0 +1,1225 @@
+<!doctype html>
+<!--
+  §§ HEADER_DOC
+  philosophy-map.html: interactive map of a project's philosophy: its values,
+  its priorities and where it stands on each.
+  Part of the "philosophical-alignment" skill. Zero dependencies: one file,
+  vanilla JavaScript, inline SVG and CSS. Works opened directly from disk.
+
+  HOW DATA GETS IN
+    1. scripts/render.py inlines the philosophy JSON into the JSON script
+       block with id "philosophy-data" near the end of this file (and,
+       optionally, a proposal into the block with id "proposal-data").
+    2. Or open this template as is and use "Load another file" / paste.
+
+  WHAT THE PAGE SHOWS (visually calm; the bottom line comes first)
+    Without a proposal: the synthesis ("Bottom line"), hard limits, tensions,
+    glossary, other terms, amendment history, in that order. Each tension shows
+    its name, its visual, its one-line stance and firmness; everything else sits
+    behind one "Details" disclosure. Value definitions stay visible next to the
+    visual. With a proposal: the page becomes a proposal review first (title,
+    overall verdict, BLUF, the decision needed, hard limits at risk, only the
+    touched tensions with stance and proposal on the same visual, one reason
+    each), and "Show the full philosophy" reveals everything else.
+
+  DISPLAY LABELS (plain words on screen; the data field names never change)
+    hard_limits      -> "Lines we never cross"
+    tensions         -> "Priorities"
+    stance           -> "Where we stand"; firmness "firm" -> "Firm position"
+    flip_conditions  -> "Exceptions we'd accept"
+    verdict flip_condition_met -> "Allowed exception"
+    status agreed / consented  -> "agreed by everyone" / "agreed, with concerns noted"
+    positions[].holder         -> a capitalised first name (maintainers[].name if given)
+    IDs such as T01 stay visible, in a quieter style, because agents cite them.
+
+  PHILOSOPHY JSON (schema "philosophical-alignment/0.x"; files labelled with the skill's
+  earlier name, "architectural-philosophy/0.x", are read the same way), fields read here:
+    project, version, schema, mission, status_note, maintainers[{handle, role}],
+    synthesis{text, as_of_version}   (the bottom line; stale when as_of_version != version),
+    strictness ("advisory" | {level, by_firmness{}, by_tension{}, note}),
+    hard_limits[{id, text, source}],
+    tensions[{id, rev, slug, kind, name, status, flip_conditions[], precedents[{title, note, link}],
+              amendments[{rev, date, summary}], positions[{holder, position|weights|priority,
+              endorsement, note}], stance{summary, firmness, ...}}],
+    amendment_log[{version, date, summary}],
+    values[{id, name, rev, definition, looks_like[], too_little, not_to_be_confused_with,
+            in_own_words, examples{good, missing_or_faked}}]   (the values glossary),
+    glossary_terms[]   (other terms the philosophy relies on; same entry shape, shown as "Other terms").
+    Poles and triad values carry "ref" (a glossary id); network tensions carry "refs"
+    (parallel to "values"). A value with no glossary entry shows "no definition yet".
+    kind "polarity": poles[2]{value, good, overdone}; stance.position in [-1, 1]
+                     (-1 = fully toward poles[0], +1 = fully toward poles[1]).
+    kind "triad":    values[3]{value, good}; stance.weights {value: share}, sums to 1.
+    kind "network":  values[] (strings or {value}); edges[{a, b, note}]; stance.priority[].
+    Unknown kinds and unknown fields are shown as plain text, never dropped silently.
+
+  PROPOSAL JSON (overlay; schema "philosophical-alignment-proposal/0.1", or the earlier
+  "architectural-philosophy-proposal/0.1"):
+    {
+      "schema": "philosophical-alignment-proposal/0.1",
+      "title": "Short noun phrase naming the proposal",
+      "summary": "One or two sentences.",
+      "bluf": "2-4 sentences: what is proposed, how it fits overall, the one decision needed.",
+      "overall": "consistent" | "departs" | "needs_decision",   // optional; computed when missing
+      "philosophy_version": "0.1.0",            // optional: version it was checked against
+      "touched": [
+        { "id": "T01",                          // tension ID
+          "position": 0.6,                      // polarity: where the proposal sits, -1..1
+          "weights": {"Correctness": 0.5, ...}, // triad: shares that sum to 1
+          "priority": ["Compatibility", ...],   // network: optional implied ordering
+          "note": "free text, any kind",
+          "verdict": "consistent" | "departs" | "flip_condition_met",
+          "flip_condition": "quoted flip condition, when verdict is flip_condition_met",
+          "reason": "why this verdict" }
+      ],
+      "hard_limits_at_risk": [ {"id": "H1", "reason": "..."} ],   // or plain ["H1"]
+      "decision_needed": "The one question the human must answer."
+    }
+    "overall" when missing is computed: needs_decision if a hard limit is at risk, a
+    contested tension is touched, or strictness above advisory applies to a departure;
+    otherwise departs if any touched tension departs; otherwise consistent.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Personal App Idea (example project) philosophy</title>
+<style>
+/* §§ TOKENS: one family, four sizes, one accent; verdict colours only on verdicts */
+:root {
+  --bg: #f7f6f2;
+  --surface: #ffffff;
+  --ink: #1d2127;
+  --ink-2: #565c66;
+  --line: #dfdcd4;
+  --accent: #23569b;
+  --ok: #2c6a45;
+  --warn: #8a5800;
+  --bad: #b02a22;
+  --bad-bg: #fbeeec;
+  --font: "Avenir Next", "Segoe UI Variable Text", "Segoe UI", Ubuntu, "DM Sans", "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+  --fs-s: 0.875rem; --fs-m: 1rem; --fs-l: 1.3rem; --fs-xl: clamp(1.9rem, 4vw, 2.6rem);
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15171b; --surface: #1c1f24; --ink: #e9e7e2; --ink-2: #a9adb5; --line: #33373f;
+    --accent: #8fb5ff; --ok: #7cc89a; --warn: #e6b85c; --bad: #ff8f85; --bad-bg: #2b1c1b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15171b; --surface: #1c1f24; --ink: #e9e7e2; --ink-2: #a9adb5; --line: #33373f;
+  --accent: #8fb5ff; --ok: #7cc89a; --warn: #e6b85c; --bad: #ff8f85; --bad-bg: #2b1c1b;
+  color-scheme: dark;
+}
+
+/* §§ BASE */
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; color: var(--ink); background: var(--bg); font: 400 var(--fs-m)/1.6 var(--font); overflow-x: hidden; font-variant-numeric: tabular-nums; }
+::selection { background: color-mix(in srgb, var(--accent) 25%, transparent); }
+.wrap { max-width: 60rem; margin: 0 auto; padding: 2.5rem 1rem 5rem; }
+h1, h2, h3, h4 { margin: 0; line-height: 1.2; font-weight: 600; text-wrap: balance; }
+h1 { font-size: var(--fs-xl); letter-spacing: -0.015em; }
+h2 { font-size: var(--fs-l); }
+h3 { font-size: var(--fs-l); }
+h4 { font-size: var(--fs-s); margin-top: 1.1rem; }
+p { margin: 0.4rem 0; }
+a { color: inherit; text-underline-offset: 3px; }
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 0.4rem 0.9rem; min-height: 2.5rem; }
+button:hover { border-color: var(--ink-2); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.muted { color: var(--ink-2); }
+.small { font-size: var(--fs-s); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+section { margin-top: 3.5rem; }
+section > h2 + p { margin-top: 0.3rem; }
+.err { color: var(--bad); font-weight: 600; }
+.warnline { color: var(--warn); font-size: var(--fs-s); }
+
+/* §§ HEADER */
+.top { display: flex; gap: 1rem; align-items: flex-start; justify-content: space-between; }
+.top > div { min-width: 0; }
+.mission { font-size: var(--fs-l); color: var(--ink-2); max-width: 44rem; margin-top: 0.6rem; line-height: 1.45; }
+.meta { color: var(--ink-2); font-size: var(--fs-s); margin-top: 0.8rem; }
+.status { color: var(--ink-2); font-size: var(--fs-s); max-width: 44rem; }
+#theme { border: 0; background: none; color: var(--ink-2); font-size: var(--fs-s); padding: 0.4rem 0.5rem; flex: none; }
+#theme:hover { color: var(--ink); }
+
+/* §§ BOTTOM_LINE */
+.lead { font-size: var(--fs-l); line-height: 1.55; max-width: 44rem; margin-top: 0.6rem; }
+.overall { display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 600; margin-top: 1rem; }
+.overall .vdot { width: 0.7rem; height: 0.7rem; }
+.decision { margin-top: 1.8rem; border: 1.5px solid var(--bad); background: var(--bad-bg); border-radius: 10px; padding: 1.1rem 1.25rem; }
+.decision h2 { font-size: var(--fs-s); color: var(--bad); }
+.peer-label { font-weight: 500; color: var(--ink-2); }
+.decision.calm { border-color: var(--line); background: transparent; }
+.decision.calm h2 { color: var(--accent); }
+.decision .q { font-size: var(--fs-l); font-weight: 600; margin: 0.3rem 0 0; line-height: 1.4; }
+
+/* §§ HARD_LIMITS */
+.limits { list-style: none; padding: 0; margin: 0.8rem 0 0; display: grid; gap: 0.6rem; max-width: 46rem; }
+.limits li { display: grid; grid-template-columns: 2.2rem minmax(0, 1fr); gap: 0 0.6rem; }
+.limits .lid { color: var(--ink-2); font-weight: 600; }
+.limits .src { color: var(--ink-2); font-size: var(--fs-s); }
+.limits li.at-risk .lid, .limits .why { color: var(--bad); }
+.limits .why { font-size: var(--fs-s); }
+
+/* §§ VERDICTS (the only coloured marks besides the accent) */
+.verdict { display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 600; font-size: var(--fs-s); white-space: nowrap; }
+.vdot { display: inline-block; width: 0.6rem; height: 0.6rem; border-radius: 50%; background: currentColor; flex: none; }
+.c-consistent { color: var(--ok); } .c-departs { color: var(--bad); } .c-flip { color: var(--warn); } .c-other { color: var(--ink-2); }
+.c-needs_decision { color: var(--bad); }
+
+/* §§ TENSIONS */
+.t-head { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: baseline; justify-content: space-between; }
+#q { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 0.4rem 0.75rem; min-height: 2.5rem; width: min(100%, 16rem); }
+.t { border-top: 1px solid var(--line); padding: 1.6rem 0 0.4rem; margin-top: 1.6rem; display: grid; gap: 1rem 2.5rem; scroll-margin-top: 1rem; min-width: 0; }
+.t:first-of-type { margin-top: 1rem; }
+@media (min-width: 52em) { .t { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); } .t > details { grid-column: 1 / -1; } }
+.t-meta { color: var(--ink-2); font-size: var(--fs-s); margin-top: 0.3rem; }
+.tid { opacity: 0.7; font-size: 0.8rem; }
+.t-stance { margin-top: 0.7rem; max-width: 34rem; }
+.t-reason { margin-top: 0.7rem; }
+.t-reason .verdict { margin-right: 0.35rem; }
+details.more > summary { cursor: pointer; color: var(--accent); font-size: var(--fs-s); font-weight: 600; width: max-content; padding: 0.3rem 0; list-style-position: inside; }
+details.more[open] > summary { margin-bottom: 0.2rem; }
+.more-body { display: grid; gap: 0 2.5rem; font-size: var(--fs-s); max-width: 52rem; }
+@media (min-width: 52em) { .more-body { grid-template-columns: 1fr 1fr; } }
+.more-body ul { margin: 0.3rem 0 0; padding-left: 1.1rem; }
+.more-body li { margin: 0.25rem 0; }
+.more-body h4:first-child { margin-top: 0.4rem; }
+
+/* §§ VALUES_INLINE (the definition sits next to the value) */
+.val { min-width: 0; }
+.val .term { font-weight: 600; }
+.def { color: var(--ink-2); font-size: var(--fs-s); margin: 0.1rem 0 0; line-height: 1.45; }
+.def.none { color: var(--warn); }
+.term { text-decoration: underline dotted; text-decoration-color: var(--ink-2); text-underline-offset: 4px; color: inherit; }
+.term.undef { text-decoration-style: dashed; }
+#tip { position: fixed; z-index: 50; display: none; max-width: min(22rem, calc(100vw - 16px)); background: var(--ink); color: var(--bg); padding: 0.55rem 0.7rem; border-radius: 8px; font-size: var(--fs-s); line-height: 1.45; pointer-events: none; box-shadow: 0 6px 20px rgba(0,0,0,.2); }
+
+/* §§ POLARITY */
+.poles { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
+.poles .val:last-child { text-align: right; }
+.track { position: relative; height: 3.6rem; margin: 0.5rem 0.5rem 0; }
+.track .line { position: absolute; left: 0; right: 0; top: 1.75rem; height: 2px; background: var(--line); }
+.track .mid { position: absolute; left: 50%; top: 1.35rem; width: 1px; height: 0.85rem; background: var(--ink-2); opacity: 0.45; }
+.mk { position: absolute; top: 1.8rem; transform: translate(-50%, -50%); }
+.mk .dot { display: block; width: 1rem; height: 1rem; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--bg); }
+.mk .diamond { display: block; width: 0.85rem; height: 0.85rem; transform: rotate(45deg); background: var(--bg); border: 2px solid currentColor; }
+.mk .peer { display: block; width: 0.55rem; height: 0.55rem; border-radius: 50%; border: 1.5px solid var(--ink-2); background: var(--bg); }
+.mk-label { position: absolute; white-space: nowrap; font-size: 0.78rem; font-weight: 600; left: 50%; transform: translateX(-50%); }
+.mk-label.above { bottom: 0.95rem; }
+.mk-label.below { top: 0.95rem; }
+.mk-label.below2 { top: 1.95rem; font-weight: 500; }
+.track.has-peers { height: 4.8rem; }
+.mk.edge-l .mk-label { left: -0.3rem; transform: none; }
+.mk.edge-r .mk-label { left: auto; right: -0.3rem; transform: none; }
+.mk.stance .mk-label { color: var(--accent); }
+.arrow { position: absolute; top: 1.75rem; height: 0; border-top: 2px dashed currentColor; opacity: 0.7; }
+.lean { color: var(--ink-2); font-size: var(--fs-s); margin-top: 0.2rem; }
+
+/* §§ TRIAD_NETWORK */
+.figure { width: 100%; max-width: 17rem; margin: 0 auto; display: block; overflow: visible; }
+.figure text { font-family: var(--font); fill: var(--ink); }
+.vlist { list-style: none; padding: 0; margin: 0.8rem 0 0; display: grid; gap: 0.55rem; }
+.vlist .num { color: var(--ink-2); font-weight: 600; margin-right: 0.35rem; }
+.vlist .share { color: var(--ink-2); font-weight: 400; margin-left: 0.35rem; }
+.keyline { color: var(--ink-2); font-size: var(--fs-s); margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.2rem 1rem; }
+.keyline span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.keyline i { display: inline-block; width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--accent); }
+.keyline i.dia { border-radius: 1px; transform: rotate(45deg); background: none; border: 2px solid currentColor; }
+.keyline i.peer { background: none; border: 1.5px solid var(--ink-2); }
+table.wt { border-collapse: collapse; margin-top: 0.4rem; width: 100%; }
+table.wt th, table.wt td { text-align: right; padding: 0.2rem 0.4rem; border-bottom: 1px solid var(--line); font-weight: 400; }
+table.wt th { color: var(--ink-2); }
+table.wt th:first-child, table.wt td:first-child { text-align: left; }
+.table-scroll { overflow-x: auto; }
+
+/* §§ GLOSSARY */
+.gl-grid { display: grid; gap: 1.6rem 2.5rem; margin-top: 1.2rem; }
+@media (min-width: 46em) { .gl-grid { grid-template-columns: 1fr 1fr; } }
+.gl { scroll-margin-top: 1rem; min-width: 0; }
+.gl h3 { font-size: var(--fs-m); }
+.gl > p { margin-top: 0.25rem; }
+.gl:target h3 { color: var(--accent); }
+.gl details { margin-top: 0.3rem; font-size: var(--fs-s); }
+.gl summary { cursor: pointer; color: var(--accent); font-weight: 600; width: max-content; max-width: 100%; }
+.gl dl { margin: 0.3rem 0 0; }
+.gl dt { font-weight: 600; margin-top: 0.6rem; }
+.gl dd { margin: 0.1rem 0 0; }
+.gl dd ul { margin: 0; padding-left: 1.1rem; }
+.gl blockquote { margin: 0; font-style: italic; }
+
+/* §§ LOG_FOOTER */
+.log { list-style: none; padding: 0; margin: 0.8rem 0 0; display: grid; gap: 0.7rem; font-size: var(--fs-s); max-width: 46rem; }
+.log .when { color: var(--ink-2); display: block; }
+.full-toggle { margin-top: 3rem; font-weight: 600; }
+.loader { margin-top: 3.5rem; font-size: var(--fs-s); }
+.loader summary { cursor: pointer; color: var(--ink-2); width: max-content; }
+.loader textarea { width: 100%; min-height: 7rem; margin-top: 0.5rem; font: 0.82rem/1.4 ui-monospace, Menlo, Consolas, monospace; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); }
+.loader .row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; align-items: center; }
+footer { margin-top: 1.5rem; font-size: var(--fs-s); color: var(--ink-2); }
+@media (prefers-reduced-motion: no-preference) { .wrap { animation: rise 0.5s var(--ease) both; } }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media print { #theme, .loader, .full-toggle, #q { display: none; } body { background: #fff; } #fullwrap[hidden] { display: block !important; } .t { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<main class="wrap" id="app" aria-live="polite"></main>
+
+<!-- §§ DATA_BLOCKS: render.py replaces the contents of these two blocks. -->
+<script type="application/json" id="philosophy-data">{
+ "schema": "philosophical-alignment/0.1-draft",
+ "project": "Personal App Idea (example project)",
+ "version": "1.1.0",
+ "status_note": "EXAMPLE PROJECT. Personal App Idea is fictional, invented for the Philosophical Alignment demo on 2026-11-23. Its maintainers, releases, dates and quotes are illustrative, not a real app's record.",
+ "mission": "Example project: Personal App Idea is a simple personal budgeting app that keeps your money data on your device.",
+ "project_types": [
+  "application"
+ ],
+ "ratified": "2026-08-04",
+ "last_amended": "2026-11-12",
+ "synthesis": {
+  "text": "Example project: Personal App Idea is a budgeting app for people who want to know where their money goes without handing their financial life to a company. Privacy comes before convenience: you type in or import your own transactions, and nothing about your money leaves your phone or computer unless it is end-to-end encrypted first. Features that connect to the outside world, such as bank sync or backup, are welcome only when you turn them on yourself, and manual entry always stays the default. The everyday app stays simple enough for a first-time budgeter, while more powerful tools, such as forecasts, live in an Advanced view you choose to open. Where money is involved, the team finishes and checks the work before it ships; everywhere else it ships small and improves later.",
+  "as_of_version": "1.1.0"
+ },
+ "maintainers": [
+  {
+   "handle": "maya",
+   "role": "lead; designs the everyday budgeting screens (fictional)"
+  },
+  {
+   "handle": "sam",
+   "role": "builds import, sync and reports (fictional)"
+  }
+ ],
+ "strictness": {
+  "level": "advisory",
+  "note": "Advisory overall. A proposal that puts the line about money data at risk always stops and asks."
+ },
+ "hard_limits": [
+  {
+   "id": "H1",
+   "text": "Unencrypted money data never leaves your device.",
+   "source": "Example: Maya's and Sam's first interviews, and the promise on the app's download page",
+   "kind": "prohibition",
+   "protects": [
+    "Privacy"
+   ]
+  }
+ ],
+ "glossary_terms": [
+  {
+   "id": "money-data",
+   "name": "money data",
+   "rev": 1,
+   "definition": "Anything that describes your finances: accounts, balances, transactions, payees, budgets and categories, including notes you attach to them."
+  },
+  {
+   "id": "end-to-end-encrypted",
+   "name": "end-to-end encrypted",
+   "rev": 1,
+   "definition": "Encrypted on your device with a key only you hold, so any server or cloud folder it passes through, the app's own included, stores only data it cannot read."
+  },
+  {
+   "id": "opt-in",
+   "name": "opt-in",
+   "rev": 1,
+   "definition": "Off until you turn it on yourself, after a plain explanation of what it sends and where."
+  },
+  {
+   "id": "advanced-view",
+   "name": "Advanced view",
+   "rev": 1,
+   "definition": "An optional part of the app that you switch on in Settings. It holds tools for experienced budgeters, and turning it on changes nothing on the screens everyone sees."
+  }
+ ],
+ "tensions": [
+  {
+   "id": "T01",
+   "rev": 1,
+   "slug": "privacy-vs-convenience",
+   "kind": "polarity",
+   "name": "Privacy vs. Convenience",
+   "poles": [
+    {
+     "value": "Privacy",
+     "ref": "privacy",
+     "good": "Your money data stays on your device, so no breach, sale or court order somewhere else can expose it.",
+     "overdone": "Everything is typed by hand, people give up after two weeks, and a private budget nobody keeps helps no one."
+    },
+    {
+     "value": "Convenience",
+     "ref": "convenience",
+     "good": "Transactions arrive on their own, so the budget stays current with almost no effort.",
+     "overdone": "Your bank logins and every purchase sit on a company's server, readable by whoever runs it or breaks into it."
+    }
+   ],
+   "stance": {
+    "position": -0.6,
+    "summary": "Privacy over convenience. Manual entry and file import are the default; anything that connects to the outside world is opt-in and end-to-end encrypted.",
+    "firmness": "firm"
+   },
+   "flip_conditions": [
+    "Cloud features are welcome when they are opt-in and end-to-end encrypted, and manual entry stays the default."
+   ],
+   "precedents": [
+    {
+     "title": "CSV import shipped before bank sync (v1.2)",
+     "note": "Importing your bank's own export file gave most of the convenience of sync with nothing leaving the device. Sync through a third-party bank-data service was set aside, because that service would have read every transaction."
+    },
+    {
+     "title": "Encrypted backup to your own cloud folder (v2.0)",
+     "note": "Off until you turn it on. The backup is encrypted on your device with your passphrase before it is written to iCloud, Google Drive or any folder you pick; Personal App Idea never sees it, and a lost passphrase means a lost backup."
+    }
+   ],
+   "status": "agreed"
+  },
+  {
+   "id": "T02",
+   "rev": 2,
+   "slug": "simple-vs-powerful",
+   "kind": "polarity",
+   "name": "Simple vs. Powerful",
+   "poles": [
+    {
+     "value": "Simplicity",
+     "ref": "simplicity",
+     "good": "A first-time budgeter understands every screen they see and keeps using the app.",
+     "overdone": "Experienced budgeters hit a ceiling within a month and go back to their spreadsheets."
+    },
+    {
+     "value": "Power",
+     "ref": "power",
+     "good": "People who plan ahead can forecast, customise and analyse without leaving Personal App Idea.",
+     "overdone": "The home screen fills with charts and settings, and new users quit before they finish their first budget."
+    }
+   ],
+   "stance": {
+    "position": -0.4,
+    "summary": "Simple by default. Advanced tools are welcome in an opt-in Advanced view; the screens everyone sees stay as simple as before.",
+    "firmness": "firm"
+   },
+   "flip_conditions": [
+    "An advanced tool may move from the Advanced view onto the everyday screens when most people who turn the Advanced view on use it, and first-time budgeters understand it without help in testing."
+   ],
+   "precedents": [
+    {
+     "title": "Split transactions kept to one simple form (v1.3)",
+     "note": "Splitting a purchase across categories stayed a single Split button with two amounts. Percentage rules and saved splits were left off the everyday screens."
+    },
+    {
+     "title": "Category rules live in Settings (v1.6)",
+     "note": "Rules such as \"anything from the farmers market is Groceries\" shipped as an opt-in screen under Settings; the add-transaction form did not change."
+    }
+   ],
+   "positions": [
+    {
+     "holder": "maya",
+     "position": -0.6,
+     "endorsement": "endorse",
+     "note": "The home screen is where people decide whether budgeting is for them; anything that makes it harder to read costs more than it adds."
+    },
+    {
+     "holder": "sam",
+     "position": 0.2,
+     "endorsement": "consent with concern",
+     "note": "Agrees to the Advanced view, but worries that tools hidden behind a switch go unnoticed by the people who would use them most. Would rather show a one-time hint once a budget has three months of history."
+    }
+   ],
+   "status": "consented",
+   "amendments": [
+    {
+     "rev": 2,
+     "date": "2026-11-12",
+     "summary": "Forecast charts confused first-time budgeters on the home screen. Before: \"If a beginner would need help with it, it does not ship.\" After: \"Simple by default; advanced tools live in an opt-in Advanced view.\""
+    }
+   ]
+  },
+  {
+   "id": "T03",
+   "rev": 1,
+   "slug": "move-fast-vs-polish",
+   "kind": "polarity",
+   "name": "Move fast vs. Polish",
+   "poles": [
+    {
+     "value": "Shipping speed",
+     "ref": "shipping-speed",
+     "good": "Fixes and small improvements reach people within days, and the app visibly gets better.",
+     "overdone": "Half-finished features and wrong totals that make people doubt every number."
+    },
+    {
+     "value": "Polish",
+     "ref": "polish",
+     "good": "Every number is right and every step is clear, so people trust the app with their money.",
+     "overdone": "Months between releases while a team of two perfects details nobody asked about."
+    }
+   ],
+   "stance": {
+    "position": 0.3,
+    "summary": "Polish first where money is involved: anything that changes a balance or a total is finished and checked before it ships. Everything else ships small and improves later.",
+    "firmness": "working"
+   },
+   "flip_conditions": [
+    "A fix for a wrong balance or a privacy bug ships as soon as it is correct, even if the wording and layout around it are still rough."
+   ],
+   "precedents": [
+    {
+     "title": "Recurring transactions waited one release (v1.4)",
+     "note": "Held back two weeks until monthly totals were right to the cent for bills that fall on the 29th, 30th or 31st."
+    }
+   ],
+   "status": "agreed"
+  }
+ ],
+ "amendment_log": [
+  {
+   "version": "1.0.0",
+   "date": "2026-08-04",
+   "id": "A0001",
+   "change_type": "adopt",
+   "tensions": [
+    "T01@1",
+    "T02@1",
+    "T03@1"
+   ],
+   "ratified_by": [
+    "maya",
+    "sam"
+   ],
+   "summary": "First confirmed philosophy, after separate interviews with Maya and Sam."
+  },
+  {
+   "version": "1.0.1",
+   "date": "2026-09-22",
+   "id": "A0002",
+   "change_type": "add-precedent",
+   "summary": "Added the encrypted backup (v2.0) as an example of a cloud feature done our way. Nothing else changed."
+  },
+  {
+   "version": "1.1.0",
+   "date": "2026-11-12",
+   "id": "A0003",
+   "change_type": "revise-stance",
+   "tensions": [
+    "T02@2"
+   ],
+   "ratified_by": [
+    "maya",
+    "sam"
+   ],
+   "summary": "Simple vs. Powerful updated to revision 2 after the spending-forecast work. Maya's and Sam's positions recorded separately; the shared position is the team's decision, not their average, and Sam agrees with a concern. Summary at the top refreshed."
+  }
+ ],
+ "values": [
+  {
+   "id": "privacy",
+   "name": "Privacy",
+   "rev": 1,
+   "definition": "The degree to which your money data stays on your own device, readable only by you, unless you choose to send it somewhere in a form only you can unlock.",
+   "looks_like": [
+    "The app works fully with no account and no internet connection",
+    "Anything that leaves the device is end-to-end encrypted with a key only you hold",
+    "No analytics or crash reports that include amounts, payees or account names"
+   ],
+   "too_little": "Your transactions sit readable on someone else's server, where a breach, a sale of the company or a court order can expose them.",
+   "not_to_be_confused_with": "Not security in general: a well-guarded server that can read your data is still not private. Not keeping data from you: exports and backups you control are fine. Not a ban on the internet: Convenience features may connect, as long as what they send is encrypted first.",
+   "in_own_words": "Private means that if the company behind the app disappeared tomorrow, or got hacked, or got bought, nobody would learn a thing about what you spend. Your phone knows. You know. That's the whole list.",
+   "examples": {
+    "good": [
+     "Backups encrypted on your phone with your passphrase before they reach your cloud folder"
+    ],
+    "missing_or_faked": [
+     "A 'private' budgeting app that sends every transaction to its server to sort it into categories"
+    ]
+   }
+  },
+  {
+   "id": "convenience",
+   "name": "Convenience",
+   "rev": 1,
+   "definition": "How little typing, setup and remembering it takes to keep your budget up to date.",
+   "looks_like": [
+    "Transactions arrive without retyping them",
+    "Categories suggested from your own past choices",
+    "A month's budget set up in a few minutes"
+   ],
+   "too_little": "People stop logging purchases after the second week, and the budget quietly goes stale.",
+   "not_to_be_confused_with": "Not Simplicity: a simple screen can still take a lot of typing, and an automatic feature can be complicated. Not doing things without asking: here, convenience never means sending data you did not choose to send.",
+   "in_own_words": "Convenient means the budget keeps itself current with almost no effort from you. Every time someone has to type the same coffee purchase by hand, that's a person deciding budgeting isn't for them.",
+   "examples": {
+    "good": [
+     "CSV import that remembers how your bank's file is laid out"
+    ],
+    "missing_or_faked": [
+     "An 'automatic' import that needs a dozen settings checked every month"
+    ]
+   }
+  },
+  {
+   "id": "simplicity",
+   "name": "Simplicity",
+   "rev": 1,
+   "definition": "How quickly a first-time budgeter can understand and use every screen they see by default, without help or a manual.",
+   "looks_like": [
+    "One home screen: what you have, what you've spent, what's left",
+    "Plain words for money ideas, with no finance jargon",
+    "New options start switched off"
+   ],
+   "too_little": "New users open the app, see charts and settings they don't understand, and leave.",
+   "not_to_be_confused_with": "Not having few features: a feature can exist as long as it doesn't crowd the screens everyone sees. Not Convenience, which is about effort, and not Polish, which is about how finished something is.",
+   "in_own_words": "Simple is my mom opening it for the first time and knowing, in ten seconds, whether she can afford dinner out this week. If she has to ask me what a screen means, it's not simple.",
+   "examples": {
+    "good": [
+     "The home screen's single 'left to spend this month' number"
+    ],
+    "missing_or_faked": [
+     "A 'simple mode' that still opens on a dashboard of six charts"
+    ]
+   }
+  },
+  {
+   "id": "power",
+   "name": "Power",
+   "rev": 1,
+   "definition": "How much a person who wants depth can plan, analyse and customise their money in Personal App Idea without leaving it for a spreadsheet.",
+   "looks_like": [
+    "Forecasts of spending and balances for the months ahead",
+    "Custom rules, splits and categories",
+    "Detailed reports and exports"
+   ],
+   "too_little": "Committed users outgrow the app and go back to their spreadsheets.",
+   "not_to_be_confused_with": "Not Convenience: powerful tools often take more effort, not less. Not complexity for its own sake: a feature counts here only if people actually use it to plan.",
+   "in_own_words": "Power is for the person who's been budgeting for ten years. They want to ask 'if I keep this up, where am I in March?' and get the answer here, not in a spreadsheet they built themselves.",
+   "examples": {
+    "good": [
+     "Category rules that sort a year of imported transactions in one pass"
+    ],
+    "missing_or_faked": [
+     "A reports page with twenty chart types and no way to answer a real question"
+    ]
+   }
+  },
+  {
+   "id": "shipping-speed",
+   "name": "Shipping speed",
+   "rev": 1,
+   "definition": "How soon an improvement or fix reaches people's devices after the team decides to build it.",
+   "looks_like": [
+    "Small releases every week or two",
+    "A reported bug fixed and released within days"
+   ],
+   "too_little": "Requests sit for months, and people assume the app has been abandoned.",
+   "not_to_be_confused_with": "Not cutting corners on money: speed here is about the size and rhythm of releases, not skipping checks. Not Power: shipping more features is different from making them deeper.",
+   "in_own_words": "Speed is how long someone waits between asking and having it. There are two of us, so small and often beats big and rare.",
+   "examples": {
+    "good": [
+     "The dark-mode fix that went out two days after the first report"
+    ],
+    "missing_or_faked": [
+     "A weekly release that only bumps the version number"
+    ]
+   }
+  },
+  {
+   "id": "polish",
+   "name": "Polish",
+   "rev": 1,
+   "definition": "How finished and trustworthy a feature feels: correct numbers, clear wording, and no rough edges in the steps people take.",
+   "looks_like": [
+    "Balances that match the bank to the cent",
+    "Every empty screen and error message says what to do next",
+    "Undo for anything that changes a number"
+   ],
+   "too_little": "One wrong total, and people stop trusting every number in the app.",
+   "not_to_be_confused_with": "Not Simplicity: a complicated screen can be polished, and a simple one can be rough. Not perfection: polish means finished for the people who will use it, not endlessly reworked.",
+   "in_own_words": "If it touches money, it has to be right and feel right. Nobody forgives a budgeting app that's off by twelve dollars.",
+   "examples": {
+    "good": [
+     "Recurring bills that land correctly at the end of short months"
+    ],
+    "missing_or_faked": [
+     "A beautiful chart whose totals don't match the transaction list"
+    ]
+   }
+  }
+ ]
+}</script>
+<script type="application/json" id="proposal-data">{
+ "schema": "philosophical-alignment-proposal/0.1",
+ "title": "Spending forecast charts on the home screen",
+ "summary": "An AI assistant built spending forecast charts that predict the next three months of spending and balances, and placed them on the home screen for everyone. (Example project.)",
+ "bluf": "Spending forecast charts that predict the next three months, built and placed on the home screen for everyone. Forecasts are welcome, but the home screen is where first-time budgeters start, and Personal App Idea keeps advanced tools like this in the opt-in Advanced view. Decision needed: ask for a revision that moves the charts into the Advanced view?",
+ "overall": "departs",
+ "philosophy_version": "1.1.0",
+ "touched": [
+  {
+   "id": "T02",
+   "rev": 2,
+   "position": 0.4,
+   "verdict": "departs",
+   "reason": "The charts appear on the home screen for everyone. Advanced tools belong in the opt-in Advanced view until most people who use that view rely on them and first-time budgeters understand them without help, and neither has been tested."
+  },
+  {
+   "id": "T03",
+   "rev": 1,
+   "position": 0.45,
+   "verdict": "consistent",
+   "reason": "The forecast totals are checked against six months of test budgets before release, so the numbers are finished before they ship."
+  }
+ ],
+ "hard_limits_at_risk": [],
+ "decision_needed": "Ask for a revision that moves the charts into the Advanced view?"
+}</script>
+
+<script>
+/* §§ SCRIPT */
+(function () {
+  "use strict";
+  var app = document.getElementById("app");
+  var DATA = null, PROPOSAL = null, LOAD_ERROR = "";
+  var state = { q: "", showFull: false };
+  var IDP = ""; // id prefix: review cards get "r-" so ids stay unique when the full philosophy is also shown
+
+  // §§ HELPERS
+  function esc(v) {
+    return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function arr(v) { return Array.isArray(v) ? v : (v == null ? [] : [v]); }
+  function readBlock(id) {
+    var el = document.getElementById(id);
+    if (!el) return null;
+    var t = (el.textContent || "").trim();
+    if (!t || t === "null") return null;
+    try { return JSON.parse(t); } catch (e) { LOAD_ERROR = "Could not parse the " + id + " block: " + e.message; return null; }
+  }
+  function valName(v) { return typeof v === "string" ? v : (v && (v.value || v.name || v.label)) || "?"; }
+  function pct(x) { return Math.round(x * 100) + "%"; }
+  function num(x) { return typeof x === "number" && isFinite(x); }
+  function signed(x) { return (x > 0 ? "+" : x < 0 ? "−" : "") + Math.abs(x).toFixed(2); }
+  function getWeights(stance, values) {
+    var w = stance && stance.weights, out = [];
+    values.forEach(function (v, i) {
+      var n = valName(v), x = null;
+      if (Array.isArray(w)) x = w[i];
+      else if (w && typeof w === "object") x = w[n];
+      out.push(num(x) ? x : null);
+    });
+    if (out.some(function (x) { return x === null; })) return null;
+    var s = out.reduce(function (a, b) { return a + b; }, 0);
+    if (!(s > 0)) return null;
+    return out.map(function (x) { return x / s; });
+  }
+  function verdictKey(v) {
+    var k = String(v || "").toLowerCase().replace(/[^a-z]/g, "");
+    if (k.indexOf("consist") === 0) return "consistent";
+    if (k.indexOf("depart") === 0) return "departs";
+    if (k.indexOf("flip") === 0) return "flip";
+    return k ? "other" : "";
+  }
+  var VERDICT_LABEL = { consistent: "Consistent", departs: "Departs", flip: "Allowed exception", other: "Unclassified" };
+  function verdictTag(v) {
+    var k = verdictKey(v);
+    if (!k) return "";
+    return '<span class="verdict c-' + k + '"><span class="vdot" aria-hidden="true"></span>' + esc(k === "other" ? v : VERDICT_LABEL[k]) + "</span>";
+  }
+  var FIRM_LABEL = { core: "Core position", firm: "Firm position", working: "Working position", exploratory: "Exploratory position", soft: "Soft position", provisional: "Provisional position", loose: "Loose position" };
+  var STATUS_LABEL = { provisional: "not yet confirmed", agreed: "agreed by everyone", consented: "agreed, with concerns noted", rough: "decided over an objection", scoped: "differs by area", contested: "not agreed yet", superseded: "replaced", retired: "retired" };
+  function statusLabel(s) { return STATUS_LABEL[String(s || "").toLowerCase()] || String(s || ""); }
+  var ENDORSE_LABEL = { "endorse": "agrees", "consent": "has no objection", "consent with concern": "agrees, with a concern", "stand aside": "stands aside", "in the rough": "still objects; the objection was heard", "object": "objects" };
+  function endorseLabel(e) { return ENDORSE_LABEL[String(e || "").toLowerCase().replace(/[_-]+/g, " ").trim()] || String(e || ""); }
+  var STRICT_NOTE = { "advisory": "the AI assistant explains and proceeds", "flag-and-ask": "the AI assistant stops and asks first", "review-gate": "changes wait for written approval" };
+  // Schema labels this page reads; "architectural-philosophy/" is the skill's earlier name.
+  var SCHEMA_PREFIXES = ["philosophical-alignment/", "architectural-philosophy/"];
+  function schemaKnown(s) { return !s || SCHEMA_PREFIXES.some(function (p) { return String(s).indexOf(p) === 0; }); }
+  // People are shown by a capitalised first name: maintainers[].name when given, else the handle.
+  function displayName(h, short) {
+    var m = arr(DATA && DATA.maintainers).filter(function (x) { return x && typeof x === "object" && x.handle === h; })[0];
+    if (m && m.name) return short ? String(m.name).trim().split(/\s+/)[0] : String(m.name);
+    return String(h || "?").split(/[-_.\s]+/).filter(Boolean).map(function (p) { return p.charAt(0).toUpperCase() + p.slice(1); }).join(" ");
+  }
+  function lowerFirst(x) { return x.charAt(0).toLowerCase() + x.slice(1); }
+  function list(items) { return "<ul>" + items.map(function (x) { return "<li>" + x + "</li>"; }).join("") + "</ul>"; }
+
+  // §§ GLOSSARY_HELPERS (every value shows its definition, keyed by ref)
+  var GLOSS = {}, GLOSS_BY_NAME = {};
+  function buildGloss() {
+    GLOSS = {}; GLOSS_BY_NAME = {};
+    arr(DATA && DATA.values).forEach(function (v) {
+      if (!v || !v.id) return;
+      GLOSS[v.id] = v;
+      if (v.name) GLOSS_BY_NAME[String(v.name).toLowerCase()] = v;
+    });
+  }
+  function gl(name, ref) { return (ref && GLOSS[ref]) || (name && GLOSS_BY_NAME[String(name).toLowerCase()]) || null; }
+  function refOf(v) { return v && typeof v === "object" ? v.ref : null; }
+  function term(name, ref) {
+    var g = gl(name, ref);
+    if (!g) return '<span class="term undef" tabindex="0" data-tip="No definition yet for this value.">' + esc(name) + "</span>";
+    return '<a class="term" href="#v-' + esc(g.id) + '" data-tip-id="' + esc(g.id) + '">' + esc(name) + "</a>";
+  }
+  function defLine(name, ref) {
+    var g = gl(name, ref);
+    if (!g || !g.definition) return '<p class="def none">No definition yet.</p>';
+    return '<p class="def">' + esc(g.definition) + "</p>";
+  }
+  function valBlock(name, ref) { return '<div class="val">' + term(name, ref) + defLine(name, ref) + "</div>"; }
+
+  // §§ PROPOSAL_INDEX
+  function touchedMap() {
+    var m = {};
+    if (!PROPOSAL) return m;
+    arr(PROPOSAL.touched).forEach(function (t) { if (t && t.id) m[t.id] = t; });
+    return m;
+  }
+  function limitsAtRisk() {
+    var m = {};
+    if (!PROPOSAL) return m;
+    arr(PROPOSAL.hard_limits_at_risk).forEach(function (h) {
+      if (typeof h === "string") m[h] = { id: h };
+      else if (h && h.id) m[h.id] = h;
+    });
+    return m;
+  }
+  // §§ OVERALL (given, or computed from the documented rules)
+  var OVERALL_LABEL = { consistent: "Fits your priorities", departs: "Departs from your priorities (explained)", needs_decision: "Needs your decision" };
+  var OVERALL_CLASS = { consistent: "consistent", departs: "departs", needs_decision: "needs_decision" };
+  function strictFor(t) {
+    var st = DATA && DATA.strictness; if (!st) return "advisory";
+    if (typeof st === "string") return st;
+    var f = t && t.stance && t.stance.firmness;
+    return (t && st.by_tension && st.by_tension[t.id]) || (f && st.by_firmness && st.by_firmness[f]) || st.level || "advisory";
+  }
+  function overallOf() {
+    var given = String(PROPOSAL.overall || "").toLowerCase().replace(/[^a-z_]/g, "");
+    if (OVERALL_LABEL[given]) return { key: given, computed: false };
+    var byId = {}; arr(DATA.tensions).forEach(function (t) { byId[t.id] = t; });
+    var risk = Object.keys(limitsAtRisk()).length > 0, contested = false, gated = false, departs = false;
+    arr(PROPOSAL.touched).forEach(function (p) {
+      var t = byId[p.id];
+      if (t && String(t.status || "").toLowerCase() === "contested") contested = true;
+      if (verdictKey(p.verdict) === "departs") { departs = true; if (strictFor(t) !== "advisory") gated = true; }
+    });
+    return { key: risk || contested || gated ? "needs_decision" : departs ? "departs" : "consistent", computed: true };
+  }
+
+  // §§ RENDER_POLARITY
+  function leanPhrase(p, poles) {
+    var a = valName(poles[0]), b = valName(poles[1]), m = Math.abs(p);
+    if (m < 0.15) return "Balanced between " + a + " and " + b;
+    var word = m < 0.45 ? "Leans toward " : m < 0.75 ? "Favors " : "Strongly favors ";
+    return word + (p < 0 ? a : b);
+  }
+  function markerPos(p) { return ((Math.max(-1, Math.min(1, p)) + 1) / 2) * 100; }
+  function edgeClass(x) { return x < 14 ? " edge-l" : x > 86 ? " edge-r" : ""; }
+  function renderPolarity(t, prop) {
+    var poles = arr(t.poles);
+    if (poles.length < 2) return '<p class="err">Polarity tension needs two poles.</p>';
+    var p = (t.stance || {}).position, peers = arr(t.positions).filter(function (m) { return num(m.position); });
+    var html = '<div class="poles">' + valBlock(valName(poles[0]), refOf(poles[0])) + valBlock(valName(poles[1]), refOf(poles[1])) + "</div>";
+    var aria = "Spectrum from " + valName(poles[0]) + " to " + valName(poles[1]) + ". Where we stand: " + (num(p) ? leanPhrase(p, poles) + " (" + signed(p) + ")" : "none recorded") + ".";
+    if (prop && num(prop.position)) aria += " Proposal: " + leanPhrase(prop.position, poles) + " (" + signed(prop.position) + ").";
+    html += '<div class="track' + (peers.length > 1 ? " has-peers" : "") + '" role="img" aria-label="' + esc(aria) + '"><span class="line"></span><span class="mid"></span>';
+    if (peers.length > 1) peers.forEach(function (m) {
+      var mx = markerPos(m.position);
+      html += '<span class="mk' + edgeClass(mx) + '" style="left:' + mx + '%" title="' + esc(displayName(m.holder)) + ": " + esc(leanPhrase(m.position, poles)) + '"><span class="peer"></span><span class="mk-label below2 peer-label">' + esc(displayName(m.holder, true)) + '</span></span>';
+    });
+    var vk = prop ? verdictKey(prop.verdict) : "";
+    if (prop && num(prop.position) && num(p)) {
+      var a = markerPos(p), b = markerPos(prop.position);
+      html += '<span class="arrow c-' + vk + '" style="left:' + Math.min(a, b) + "%;width:" + Math.abs(b - a) + '%"></span>';
+    }
+    if (num(p)) { var sx = markerPos(p); html += '<span class="mk stance' + edgeClass(sx) + '" style="left:' + sx + '%"><span class="dot"></span><span class="mk-label above">' + (prop ? "Where we stand" : "") + "</span></span>"; }
+    if (prop && num(prop.position)) { var px = markerPos(prop.position); html += '<span class="mk c-' + vk + edgeClass(px) + '" style="left:' + px + '%"><span class="diamond"></span><span class="mk-label below">Proposal</span></span>'; }
+    html += "</div>";
+    html += '<p class="lean">' + esc(num(p) ? leanPhrase(p, poles) : "No stance position recorded") + "</p>";
+    if (peers.length > 1) html += '<p class="keyline"><span><i class="peer"></i>Each maintainer, kept separate</span></p>';
+    return html;
+  }
+
+  // §§ RENDER_TRIAD
+  var TV = [[160, 30], [28, 258.6], [292, 258.6]]; // top, bottom-left, bottom-right
+  function bary(w) { return [w[0] * TV[0][0] + w[1] * TV[1][0] + w[2] * TV[2][0], w[0] * TV[0][1] + w[1] * TV[1][1] + w[2] * TV[2][1]]; }
+  function renderTriad(t, prop) {
+    var values = arr(t.values);
+    if (values.length !== 3) return '<p class="err">Triad tension needs exactly three values.</p>';
+    var names = values.map(valName), w = getWeights(t.stance, values);
+    var peers = arr(t.positions).map(function (m) { return { m: m, w: getWeights(m, values) }; }).filter(function (o) { return o.w; });
+    var pw = prop ? getWeights(prop, values) : null, vk = prop ? verdictKey(prop.verdict) : "";
+    var s = '<svg class="figure" viewBox="0 0 320 300" role="img" aria-labelledby="' + IDP + 'tri-' + esc(t.id) + '"><title id="' + IDP + 'tri-' + esc(t.id) + '">' +
+      esc("Triangle of " + names.join(", ") + (w ? ". Where we stand: " + names.map(function (n, i) { return n + " " + pct(w[i]); }).join(", ") : "") + (pw ? ". Proposal: " + names.map(function (n, i) { return n + " " + pct(pw[i]); }).join(", ") : "")) + "</title>";
+    s += '<polygon points="' + TV.map(function (v) { return v.join(","); }).join(" ") + '" fill="none" stroke="var(--line)" stroke-width="2"/>';
+    var lab = [[160, 16, "middle"], [22, 284, "start"], [298, 284, "end"]];
+    names.forEach(function (n, i) { s += '<text x="' + lab[i][0] + '" y="' + lab[i][1] + '" text-anchor="' + lab[i][2] + '" font-size="15" font-weight="600">' + esc(n) + "</text>"; });
+    if (peers.length > 1) peers.forEach(function (o) {
+      var q = bary(o.w);
+      s += '<g><title>' + esc(displayName(o.m.holder)) + "</title><circle cx=\"" + q[0].toFixed(1) + '" cy="' + q[1].toFixed(1) + '" r="5" fill="var(--bg)" stroke="var(--ink-2)" stroke-width="1.5"/><text x="' + (q[0] + 9).toFixed(1) + '" y="' + (q[1] + 4).toFixed(1) + '" font-size="11" style="fill:var(--ink-2)">' + esc(displayName(o.m.holder, true)) + "</text></g>";
+    });
+    if (w && pw) { var q1 = bary(w), q2 = bary(pw); s += '<line x1="' + q1[0] + '" y1="' + q1[1] + '" x2="' + q2[0] + '" y2="' + q2[1] + '" stroke="currentColor" stroke-dasharray="4 3" stroke-width="2" class="c-' + vk + '"/>'; }
+    if (w) { var q = bary(w); s += '<circle cx="' + q[0] + '" cy="' + q[1] + '" r="8" fill="var(--accent)" stroke="var(--bg)" stroke-width="3"/>'; }
+    if (pw) { var r = bary(pw); s += '<rect x="' + (r[0] - 6) + '" y="' + (r[1] - 6) + '" width="12" height="12" transform="rotate(45 ' + r[0] + " " + r[1] + ')" fill="var(--bg)" stroke="currentColor" stroke-width="2" class="c-' + vk + '"/>'; }
+    s += "</svg>";
+    var key = '<p class="keyline"><span><i></i>Where we stand</span>' + (pw ? '<span class="c-' + vk + '"><i class="dia"></i><span style="color:var(--ink-2)">Proposal</span></span>' : "") + (peers.length > 1 ? "<span><i class=\"peer\"></i>Each maintainer, kept separate</span>" : "") + "</p>";
+    var vl = '<ul class="vlist">' + values.map(function (v, i) {
+      return '<li><div class="val">' + term(valName(v), refOf(v)) + (w ? '<span class="share">' + pct(w[i]) + (pw ? " → " + pct(pw[i]) : "") + "</span>" : "") + defLine(valName(v), refOf(v)) + "</div></li>";
+    }).join("") + "</ul>";
+    return s + key + vl;
+  }
+
+  // §§ RENDER_NETWORK
+  function renderNetwork(t, prop) {
+    var names = arr(t.values).map(valName), n = names.length;
+    var refs = arr(t.refs), refFor = function (i) { return refs[i] || refOf(arr(t.values)[i]); };
+    var nameRef = function (v) { var i = names.indexOf(v); return i >= 0 ? refFor(i) : null; };
+    if (!n) return '<p class="err">Network tension has no values.</p>';
+    var pr = arr(t.stance && t.stance.priority), rank = {};
+    pr.forEach(function (v, i) { rank[v] = i + 1; });
+    var cx = 160, cy = 120, R = n <= 4 ? 80 : 92, pos = {};
+    names.forEach(function (v, i) {
+      var ang = -Math.PI / 2 + (i * 2 * Math.PI) / n + (n === 4 ? Math.PI / 4 : 0);
+      pos[v] = [cx + R * Math.cos(ang), cy + R * Math.sin(ang)];
+    });
+    var s = '<svg class="figure" viewBox="0 0 320 250" role="img" aria-labelledby="' + IDP + 'net-' + esc(t.id) + '"><title id="' + IDP + 'net-' + esc(t.id) + '">' + esc("Network of " + names.join(", ") + (pr.length ? ". Priority: " + pr.join(" then ") : "")) + "</title>";
+    arr(t.edges).forEach(function (e) {
+      var a = pos[e.a], b = pos[e.b];
+      if (a && b) s += '<line x1="' + a[0] + '" y1="' + a[1] + '" x2="' + b[0] + '" y2="' + b[1] + '" stroke="var(--line)" stroke-width="2"/>';
+    });
+    names.forEach(function (v) {
+      var p = pos[v], r = rank[v], first = r === 1;
+      s += '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="15" fill="' + (first ? "var(--accent)" : "var(--bg)") + '" stroke="' + (first ? "var(--accent)" : "var(--ink-2)") + '" stroke-width="1.5"/>';
+      s += '<text x="' + p[0] + '" y="' + (p[1] + 5) + '" text-anchor="middle" font-size="13" font-weight="600" style="fill:' + (first ? "var(--bg)" : "var(--ink)") + '">' + (r || "–") + "</text>";
+      var ty = p[1] > cy ? p[1] + 33 : p[1] - 23;
+      s += '<text x="' + p[0] + '" y="' + ty + '" text-anchor="middle" font-size="13" font-weight="600">' + esc(v) + "</text>";
+    });
+    s += "</svg>";
+    var order = pr.length ? pr.concat(names.filter(function (v) { return pr.indexOf(v) < 0; })) : names;
+    var out = s + '<ol class="vlist">' + order.map(function (v) {
+      return '<li><div class="val"><span class="num">' + (rank[v] || "–") + "</span>" + term(v, nameRef(v)) + defLine(v, nameRef(v)) + "</div></li>";
+    }).join("") + "</ol>";
+    var pp = prop ? arr(prop.priority) : [];
+    if (pp.length) {
+      var same = pp.join("|") === pr.join("|");
+      out += '<p class="keyline c-' + verdictKey(prop.verdict) + '"><span><i class="dia"></i><span style="color:var(--ink-2)">' + (same ? "Proposal keeps this order." : "Proposal implies: " + pp.map(esc).join(" › ")) + "</span></span></p>";
+    }
+    return out;
+  }
+
+  // §§ RENDER_DETAILS (everything beyond the default view, behind one disclosure)
+  function renderUnknown(t) {
+    var known = { id: 1, rev: 1, slug: 1, kind: 1, name: 1, stance: 1, flip_conditions: 1, precedents: 1, status: 1, positions: 1, amendments: 1, poles: 1, values: 1, refs: 1, edges: 1 };
+    var extra = Object.keys(t).filter(function (k) { return !known[k]; });
+    if (!extra.length) return "";
+    return "<div><h4>Other fields</h4>" + list(extra.map(function (k) { return esc(k) + ": " + esc(typeof t[k] === "object" ? JSON.stringify(t[k]) : t[k]); })) + "</div>";
+  }
+  function goodsHTML(t) {
+    var vals = t.kind === "polarity" ? arr(t.poles) : arr(t.values);
+    var rows = vals.filter(function (v) { return v && (v.good || v.overdone); }).map(function (v) {
+      return "<strong>" + term(valName(v), refOf(v)) + "</strong>" + (v.good ? ": " + esc(v.good) : "") + (v.overdone ? " <span class=\"muted\">Overdone: " + esc(v.overdone) + "</span>" : "");
+    });
+    return rows.length ? "<div><h4>When each side goes well, and when it is overdone</h4>" + list(rows) + "</div>" : "";
+  }
+  function renderDetails(t, prop, review) {
+    var st = t.stance || {}, h = "";
+    if (review && st.summary) h += "<div><h4>Where we stand</h4><p>" + esc(st.summary) + "</p></div>";
+    if (prop && (prop.flip_condition || prop.note)) h += "<div><h4>About this proposal</h4>" + (prop.flip_condition ? "<p>Exception cited: “" + esc(prop.flip_condition) + "”</p>" : "") + (prop.note ? "<p>" + esc(prop.note) + "</p>" : "") + "</div>";
+    var flips = arr(t.flip_conditions);
+    h += "<div><h4>Exceptions we’d accept</h4>" + (flips.length ? list(flips.map(function (f) { return esc(typeof f === "string" ? f : f.text || JSON.stringify(f)); })) : '<p class="muted">None recorded: this position holds in every case named so far.</p>') + "</div>";
+    var precs = arr(t.precedents);
+    if (precs.length) h += "<div><h4>Precedents</h4>" + list(precs.map(function (p) {
+      if (typeof p === "string") return esc(p);
+      var href = p.link || p.url; // "link" is the schema field; "url" is read too
+      var title = href ? '<a href="' + esc(href) + '">' + esc(p.title || href) + "</a>" : esc(p.title || p.id || "");
+      return "<strong>" + title + "</strong>" + (p.note ? ": " + esc(p.note) : "");
+    })) + "</div>";
+    h += goodsHTML(t);
+    var pos = arr(t.positions);
+    if (pos.length) {
+      h += "<div><h4>Maintainer positions (kept separate, never averaged)</h4>" + list(pos.map(function (m) {
+        var bits = [], poles = arr(t.poles);
+        if (num(m.position)) bits.push(t.kind === "polarity" && poles.length > 1 ? esc(lowerFirst(leanPhrase(m.position, poles))) : signed(m.position));
+        if (Array.isArray(m.priority)) bits.push(m.priority.map(esc).join(" › "));
+        if (m.endorsement) bits.push(esc(endorseLabel(m.endorsement)));
+        return "<strong>" + esc(displayName(m.holder)) + "</strong>" + (bits.length ? ": " + bits.join("; ") : "") + (m.note ? ". " + esc(m.note) : "");
+      }));
+      if (t.kind === "triad") {
+        var values = arr(t.values), w = getWeights(t.stance, values), rows = pos.map(function (m) { return { m: m, w: getWeights(m, values) }; }).filter(function (o) { return o.w; });
+        if (rows.length) {
+          h += '<div class="table-scroll"><table class="wt"><thead><tr><th>Value</th>' + (w ? "<th>Where we stand</th>" : "") + rows.map(function (o) { return "<th>" + esc(displayName(o.m.holder)) + "</th>"; }).join("") + "</tr></thead><tbody>";
+          values.forEach(function (v, i) { h += "<tr><td>" + esc(valName(v)) + "</td>" + (w ? "<td>" + pct(w[i]) + "</td>" : "") + rows.map(function (o) { return "<td>" + pct(o.w[i]) + "</td>"; }).join("") + "</tr>"; });
+          h += "</tbody></table></div>";
+        }
+      }
+      h += "</div>";
+    }
+    var edges = arr(t.edges);
+    if (edges.length) h += "<div><h4>How the values pull on each other</h4>" + list(edges.map(function (e) { return "<strong>" + esc(e.a) + " and " + esc(e.b) + "</strong>" + (e.note ? ": " + esc(e.note) : ""); })) + "</div>";
+    var am = arr(t.amendments);
+    if (am.length) h += "<div><h4>Revisions</h4>" + list(am.map(function (a) { return "Revision " + esc(a.rev) + ", " + esc(a.date || "") + ": " + esc(a.summary || ""); })) + "</div>";
+    h += renderUnknown(t);
+    return '<details class="more"><summary>Details</summary><div class="more-body">' + h + "</div></details>";
+  }
+
+  // §§ RENDER_CARD
+  function renderCard(t, prop, review) {
+    var st = t.stance || {};
+    var visual = t.kind === "polarity" ? renderPolarity(t, prop) : t.kind === "triad" ? renderTriad(t, prop) : t.kind === "network" ? renderNetwork(t, prop) : '<p class="muted">Kind “' + esc(t.kind) + '” has no dedicated view yet; its fields are under Details.</p>';
+    var meta = [FIRM_LABEL[st.firmness] || (st.firmness ? esc(st.firmness) + " position" : ""), t.status ? esc(statusLabel(t.status)) : "", t.id ? '<span class="tid">' + esc(t.id) + (t.rev != null ? ", revision " + esc(t.rev) : "") + "</span>" : ""].filter(Boolean).join(" · ");
+    var h = '<article class="t" id="' + IDP + esc(t.id) + '" data-search="' + esc(JSON.stringify(t).toLowerCase()) + '"><div>';
+    h += "<h3>" + esc(t.name || t.slug || t.id) + "</h3>";
+    h += '<p class="t-meta">' + meta + "</p>";
+    if (review && prop) h += '<p class="t-reason">' + verdictTag(prop.verdict) + esc(prop.reason || "") + "</p>";
+    else if (st.summary) h += '<p class="t-stance">' + esc(st.summary) + "</p>";
+    h += "</div><div>" + visual + "</div>" + renderDetails(t, prop, review) + "</article>";
+    return h;
+  }
+
+  // §§ RENDER_SECTIONS
+  function headerHTML(d) {
+    var h = '<header class="top"><div><h1>' + esc(d.project || "Untitled project") + "</h1>";
+    if (d.mission) h += '<p class="mission">' + esc(d.mission) + "</p>";
+    var bits = ["Philosophy" + (d.version ? ", version " + esc(d.version) : "")];
+    if (arr(d.maintainers).length) bits.push("Maintainers: " + arr(d.maintainers).map(function (m) { return '<span title="' + esc(m.role || "") + '">' + esc(typeof m === "object" ? (m.name || displayName(m.handle)) : displayName(m)) + "</span>"; }).join(", "));
+    if (d.strictness) {
+      var st = typeof d.strictness === "string" ? { level: d.strictness } : d.strictness, raised = [], lvl = st.level || "advisory";
+      Object.keys(st.by_firmness || {}).forEach(function (k) { raised.push(k + " positions: " + st.by_firmness[k]); });
+      Object.keys(st.by_tension || {}).forEach(function (k) { raised.push(k + ": " + st.by_tension[k]); });
+      bits.push('<span title="' + esc(st.note || "") + '">Strictness: ' + esc(lvl) + (STRICT_NOTE[lvl] ? " (" + STRICT_NOTE[lvl] + ")" : "") + (raised.length ? "; raised for " + esc(raised.join("; ")) : "") + "</span>");
+    }
+    h += '<p class="meta">' + bits.join(" · ") + "</p>";
+    if (d.status_note) h += '<p class="status">' + esc(d.status_note) + "</p>";
+    if (!schemaKnown(d.schema)) h += '<p class="warnline">This file’s schema label, “' + esc(d.schema) + '”, is not one this page knows, so some parts may not show.</p>';
+    return h + "</div>" + themeBtn() + "</header>";
+  }
+  function synthesisHTML(d) {
+    var s = d.synthesis, h = '<section aria-labelledby="bl"><h2 id="bl">Bottom line</h2>';
+    if (s && s.text) {
+      h += '<p class="lead">' + esc(s.text) + "</p>";
+      if (s.as_of_version && d.version && s.as_of_version !== d.version) h += '<p class="warnline">Written for version ' + esc(s.as_of_version) + "; the philosophy is now version " + esc(d.version) + ", so this summary may be out of date.</p>";
+    } else h += '<p class="muted">No synthesis yet. Your AI assistant drafts one after the first interview, and the maintainers confirm it.</p>';
+    return h + "</section>";
+  }
+  function limitsHTML(d, onlyRisk) {
+    var risk = limitsAtRisk(), limits = arr(d.hard_limits).filter(function (l) { return !onlyRisk || risk[l.id]; });
+    if (!limits.length) return "";
+    var h = '<section aria-labelledby="hl' + (onlyRisk ? "r" : "") + '"><h2 id="hl' + (onlyRisk ? "r" : "") + '">' + (onlyRisk ? (limits.length > 1 ? "Lines we never cross are at risk" : "A line we never cross is at risk") : "Lines we never cross") + "</h2>";
+    if (!onlyRisk) h += '<p class="muted small">Never traded against anything. Crossing one needs a change to the philosophy itself.</p>';
+    h += '<ol class="limits">' + limits.map(function (l) {
+      var r = risk[l.id];
+      return '<li class="' + (r ? "at-risk" : "") + '"><span class="lid">' + esc(l.id) + "</span><span>" + esc(l.text || l) +
+        (r ? '<br><span class="why">' + (onlyRisk ? "" : "At risk from this proposal. ") + esc(r.reason || "") + "</span>" : "") +
+        (l.source && !onlyRisk ? '<br><span class="src">Source: ' + esc(l.source) + "</span>" : "") + "</span></li>";
+    }).join("") + "</ol>";
+    return h + "</section>";
+  }
+  function tensionsHTML(d) {
+    var tensions = arr(d.tensions), touched = touchedMap();
+    var h = '<section aria-labelledby="tn"><div class="t-head"><h2 id="tn">Priorities</h2><label class="sr-only" for="q">Search priorities</label><input type="search" id="q" placeholder="Search priorities" value="' + esc(state.q) + '"></div>';
+    h += '<p class="muted small">Each one names two or more good things that pull against each other, and where this project stands.</p>';
+    h += tensions.map(function (t) { return renderCard(t, touched[t.id], false); }).join("");
+    h += '<p class="muted" id="nomatch" hidden>No priorities match.</p>';
+    return h + "</section>";
+  }
+  function glossaryHTML(d) {
+    var vals = arr(d.values);
+    if (!vals.length) return "";
+    var h = '<section aria-labelledby="vg"><h2 id="vg">Glossary</h2><p class="muted small">What each value means in this project. Every priority uses these meanings.</p><div class="gl-grid">';
+    vals.forEach(function (v) {
+      if (!v) return;
+      var more = glMore(v, true);
+      h += '<article class="gl" id="v-' + esc(v.id) + '"><h3>' + esc(v.name || v.id) + "</h3>" + (v.definition ? "<p>" + esc(v.definition) + "</p>" : '<p class="def none">No definition yet.</p>') +
+        "<details><summary>Examples and the maintainer's words</summary><dl>" + more + "</dl></details></article>";
+    });
+    return h + "</div></section>";
+  }
+  function termsHTML(d) {
+    var terms = arr(d.glossary_terms).filter(function (g) { return g && (g.id || g.name); });
+    if (!terms.length) return "";
+    var h = '<section aria-labelledby="ot"><h2 id="ot">Other terms</h2><p class="muted small">Words the philosophy relies on that are not values, and what they mean here.</p><div class="gl-grid">';
+    terms.forEach(function (g) {
+      var more = glMore(g, false), gid = g.id || String(g.name).toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      h += '<article class="gl" id="g-' + esc(gid) + '"><h3>' + esc(g.name || g.id) + "</h3>" + (g.definition ? "<p>" + esc(g.definition) + "</p>" : '<p class="def none">No definition yet.</p>') +
+        (more ? "<details><summary>More about this term</summary><dl>" + more + "</dl></details>" : "") + "</article>";
+    });
+    return h + "</div></section>";
+  }
+  // The detail list shared by values and other terms. Values always show the maintainer's-words line
+  // and their revision; terms show only the fields they have.
+  function glMore(v, isValue) {
+    var more = "";
+    if (arr(v.looks_like).length) more += "<dt>Looks like</dt><dd><ul>" + arr(v.looks_like).map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul></dd>";
+    if (v.too_little) more += "<dt>Too little looks like</dt><dd>" + esc(v.too_little) + "</dd>";
+    if (v.not_to_be_confused_with) more += "<dt>Not to be confused with</dt><dd>" + esc(v.not_to_be_confused_with) + "</dd>";
+    if (isValue || v.in_own_words) more += "<dt>In the maintainer's own words</dt><dd>" + (v.in_own_words ? "<blockquote>" + esc(v.in_own_words) + "</blockquote>" : '<span class="def none">Not yet captured.</span>') + "</dd>";
+    var ex = v.examples || {};
+    if (arr(ex.good).length) more += "<dt>Done well</dt><dd>" + exList(ex.good) + "</dd>";
+    if (arr(ex.missing_or_faked).length) more += "<dt>Missing or faked</dt><dd>" + exList(ex.missing_or_faked) + "</dd>";
+    Object.keys(v).forEach(function (k) {
+      if (["id", "name", "rev", "definition", "looks_like", "too_little", "not_to_be_confused_with", "in_own_words", "examples"].indexOf(k) < 0 && v[k] != null && v[k] !== "")
+        more += "<dt>" + esc(k.replace(/_/g, " ")) + "</dt><dd>" + esc(typeof v[k] === "object" ? JSON.stringify(v[k]) : v[k]) + "</dd>";
+    });
+    if (isValue) more += "<dt>Revision</dt><dd>" + esc(v.id) + ", revision " + esc(v.rev != null ? v.rev : 1) + "</dd>";
+    return more;
+  }
+  // Examples may be one string or a list of strings.
+  function exList(x) { var a = arr(x).map(function (e) { return esc(typeof e === "string" ? e : JSON.stringify(e)); }); return a.length > 1 ? "<ul>" + a.map(function (e) { return "<li>" + e + "</li>"; }).join("") + "</ul>" : a[0] || ""; }
+  function logHTML(d) {
+    var tlog = [];
+    arr(d.tensions).forEach(function (t) { arr(t.amendments).forEach(function (a) { tlog.push({ date: a.date, label: (t.name || t.id) + ", revision " + a.rev, summary: a.summary }); }); });
+    arr(d.amendment_log).forEach(function (a) { tlog.push({ date: a.date, label: a.version ? "Version " + a.version : (a.id || ""), summary: a.summary }); });
+    tlog.sort(function (a, b) { return String(b.date || "").localeCompare(String(a.date || "")); });
+    if (!tlog.length) return "";
+    return '<section aria-labelledby="al"><h2 id="al">Update history</h2><ol class="log">' + tlog.map(function (a) {
+      return '<li><span class="when">' + esc(a.label) + (a.date ? ", " + esc(a.date) : "") + "</span>" + esc(a.summary || "") + "</li>";
+    }).join("") + "</ol></section>";
+  }
+  function philosophyHTML(d) { return synthesisHTML(d) + limitsHTML(d, false) + tensionsHTML(d) + glossaryHTML(d) + termsHTML(d) + logHTML(d); }
+
+  // §§ RENDER_REVIEW (a proposal turns the page into a review first)
+  function reviewHTML(d) {
+    var P = PROPOSAL, touched = touchedMap(), tensions = arr(d.tensions), ov = overallOf();
+    var h = '<header class="top"><div><h1>' + esc(P.title || "Untitled proposal") + "</h1>";
+    h += '<p class="meta">Proposal review against the ' + esc(d.project || "project") + " philosophy" + (d.version ? ", version " + esc(d.version) : "") + "</p></div>" + themeBtn() + "</header>";
+    h += '<p class="overall c-' + OVERALL_CLASS[ov.key] + '"><span class="vdot" aria-hidden="true"></span>' + esc(OVERALL_LABEL[ov.key]) + (ov.computed ? ' <span class="muted small" style="font-weight:400">(worked out from the verdicts below)</span>' : "") + "</p>";
+    h += '<p class="lead">' + esc(P.bluf || P.summary || "No bottom line written for this proposal yet.") + "</p>";
+    if (P.decision_needed) h += '<div class="decision' + (ov.key === "needs_decision" ? "" : " calm") + '" role="note" aria-labelledby="dn"><h2 id="dn">Decision needed</h2><p class="q">' + esc(P.decision_needed) + "</p></div>";
+    if (P.philosophy_version && d.version && P.philosophy_version !== d.version) h += '<p class="warnline" style="margin-top:1rem">Checked against version ' + esc(P.philosophy_version) + "; the philosophy is now version " + esc(d.version) + ".</p>";
+    var unknown = arr(P.touched).filter(function (t) { return !tensions.some(function (x) { return x.id === t.id; }); });
+    if (unknown.length) h += '<p class="err">This proposal names priorities the philosophy does not have: ' + unknown.map(function (t) { return esc(t.id); }).join(", ") + "</p>";
+    h += limitsHTML(d, true);
+    var shown = tensions.filter(function (t) { return touched[t.id]; });
+    var counts = {}; shown.forEach(function (t) { var k = verdictKey(touched[t.id].verdict); counts[k] = (counts[k] || 0) + 1; });
+    // bug 2: singular and plural phrases ("1 departs", "2 are consistent", "1 is an allowed exception")
+    var PHRASE = { departs: ["departs", "depart"], flip: ["is an allowed exception", "are allowed exceptions"], consistent: ["is consistent", "are consistent"], other: ["is unclassified", "are unclassified"] };
+    var tally = ["departs", "flip", "consistent", "other"].filter(function (k) { return counts[k]; }).map(function (k) { return counts[k] + " " + PHRASE[k][counts[k] === 1 ? 0 : 1]; }).join(", ");
+    var rest = tensions.length - shown.length;
+    h += '<section aria-labelledby="tt"><h2 id="tt">Priorities this change touches</h2><p class="muted small">' + esc(tally) + (tally ? "." : "") + (rest ? " " + rest + " other priorit" + (rest > 1 ? "ies are" : "y is") + " untouched." : "") + "</p>";
+    IDP = "r-"; h += shown.map(function (t) { return renderCard(t, touched[t.id], true); }).join("") + "</section>"; IDP = "";
+    if (P.bluf && P.summary) h += '<p class="muted small" style="margin-top:2rem">As submitted: ' + esc(P.summary) + "</p>";
+    return h;
+  }
+
+  // §§ RENDER_PAGE
+  function loaderHTML(open) {
+    return '<details class="loader"' + (open ? " open" : "") + "><summary>" + (DATA ? "Load another file or a proposal" : "Open a philosophy file") + "</summary>" +
+      '<p class="muted">Paste philosophy or proposal JSON (the comment at the top of this file shows both shapes), or choose a file.</p>' +
+      '<textarea id="paste" spellcheck="false" aria-label="JSON to load"></textarea><div class="row"><button type="button" id="apply">Apply</button>' +
+      '<label class="muted">or file: <input type="file" id="file" accept=".json,application/json"></label>' +
+      (PROPOSAL ? '<button type="button" id="clearprop">Remove the proposal</button>' : "") + '<span id="loadmsg" class="err" role="alert"></span></div></details>';
+  }
+  function themeBtn() {
+    var t = document.documentElement.getAttribute("data-theme") || "auto";
+    return '<button type="button" id="theme" aria-label="Color theme: ' + t + ', click to change">' + (t === "auto" ? "Theme: auto" : t === "light" ? "Theme: light" : "Theme: dark") + "</button>";
+  }
+  function render() {
+    buildGloss();
+    if (!DATA) {
+      app.innerHTML = '<header class="top"><div><h1>Philosophy map</h1><p class="mission">No philosophy is embedded in this page yet.</p></div>' + themeBtn() + "</header>" +
+        (LOAD_ERROR ? '<p class="err">' + esc(LOAD_ERROR) + "</p>" : "") + loaderHTML(true);
+      wire(); return;
+    }
+    var d = DATA, h = "";
+    if (LOAD_ERROR) h += '<p class="err">' + esc(LOAD_ERROR) + "</p>";
+    if (PROPOSAL) {
+      h += reviewHTML(d);
+      h += '<button type="button" class="full-toggle" id="full" aria-expanded="' + state.showFull + '" aria-controls="fullwrap">' + (state.showFull ? "Hide the full philosophy" : "Show the full philosophy") + "</button>";
+      h += '<div id="fullwrap"' + (state.showFull ? "" : " hidden") + ">" + headerHTML(d).replace(/<button type="button" id="theme"[^]*?<\/button>/, "").replace('<header class="top">', '<header class="top" style="margin-top:3rem">') + philosophyHTML(d) + "</div>";
+    } else h += headerHTML(d) + philosophyHTML(d);
+    h += loaderHTML(false);
+    h += "<footer>Made with the philosophical-alignment skill.</footer>";
+    app.innerHTML = h;
+    wire(); filter();
+  }
+
+  // §§ TOOLTIP (hover, focus or tap on a value name shows its definition)
+  var tip = document.createElement("div");
+  tip.id = "tip"; tip.setAttribute("role", "tooltip");
+  document.body.appendChild(tip);
+  function showTip(el) {
+    var id = el.getAttribute("data-tip-id"), g = id && GLOSS[id];
+    tip.innerHTML = g ? "<strong>" + esc(g.name || g.id) + "</strong><br>" + esc(g.definition || "No definition yet.") : esc(el.getAttribute("data-tip") || "");
+    tip.style.display = "block";
+    var r = el.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+    var left = Math.max(8, Math.min(r.left + r.width / 2 - tw / 2, window.innerWidth - tw - 8));
+    var top = r.bottom + 8; if (top + th > window.innerHeight - 8) top = r.top - th - 8;
+    tip.style.left = left + "px"; tip.style.top = Math.max(8, top) + "px";
+  }
+  function hideTip() { tip.style.display = "none"; }
+  function tipTarget(e) { return e.target && e.target.closest ? e.target.closest("[data-tip-id],[data-tip]") : null; }
+  document.addEventListener("mouseover", function (e) { var el = tipTarget(e); if (el) showTip(el); else hideTip(); });
+  document.addEventListener("focusin", function (e) { var el = tipTarget(e); if (el) showTip(el); else hideTip(); });
+  document.addEventListener("focusout", hideTip);
+  window.addEventListener("scroll", hideTip, { passive: true });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") hideTip(); });
+
+  // §§ EVENTS
+  function filter() {
+    var q = state.q.trim().toLowerCase(), any = false;
+    app.querySelectorAll("section .t[data-search]").forEach(function (a) {
+      if (a.closest("#fullwrap") === null && PROPOSAL) return; // review cards are never filtered
+      var ok = !q || a.getAttribute("data-search").indexOf(q) >= 0; a.hidden = !ok; if (ok) any = true;
+    });
+    var nm = document.getElementById("nomatch"); if (nm) nm.hidden = any;
+  }
+  function revealHash() {
+    var id = decodeURIComponent(location.hash.slice(1)); if (!id) return;
+    var el = document.getElementById(id); if (!el) return;
+    var fw = document.getElementById("fullwrap");
+    if (fw && fw.hidden && fw.contains(el)) { state.showFull = true; render(); el = document.getElementById(id); }
+    var det = el.querySelector && el.querySelector("details"); if (det && el.classList.contains("gl")) det.open = true;
+    el.scrollIntoView({ block: "start" });
+  }
+  window.addEventListener("hashchange", revealHash);
+  function wire() {
+    var q = document.getElementById("q");
+    if (q) q.addEventListener("input", function () { state.q = q.value; filter(); });
+    var full = document.getElementById("full");
+    if (full) full.addEventListener("click", function () { state.showFull = !state.showFull; render(); var f = document.getElementById("full"); f.focus(); });
+    document.getElementById("theme").addEventListener("click", function () {
+      var cur = document.documentElement.getAttribute("data-theme") || "auto";
+      var next = cur === "auto" ? "light" : cur === "light" ? "dark" : "auto";
+      if (next === "auto") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", next);
+      try { localStorage.setItem("phil-map-theme", next); } catch (e) {}
+      render(); document.getElementById("theme").focus();
+    });
+    var apply = document.getElementById("apply");
+    if (apply) apply.addEventListener("click", function () { loadText(document.getElementById("paste").value); });
+    var file = document.getElementById("file");
+    if (file) file.addEventListener("change", function () {
+      var f = file.files && file.files[0]; if (!f) return;
+      var rd = new FileReader(); rd.onload = function () { loadText(String(rd.result)); }; rd.readAsText(f);
+    });
+    var cp = document.getElementById("clearprop");
+    if (cp) cp.addEventListener("click", function () { PROPOSAL = null; render(); });
+  }
+  function loadText(txt) {
+    var msg = document.getElementById("loadmsg"), obj;
+    try { obj = JSON.parse(txt); } catch (e) { msg.textContent = "Not valid JSON: " + e.message; return; }
+    if (obj && Array.isArray(obj.tensions)) { DATA = obj; LOAD_ERROR = ""; }
+    else if (obj && Array.isArray(obj.touched)) {
+      if (!DATA) { msg.textContent = "That is a proposal; open a philosophy first."; return; }
+      PROPOSAL = obj; state.showFull = false;
+    } else { msg.textContent = "Not a philosophy (needs a tensions list) or a proposal (needs a touched list)."; return; }
+    render(); window.scrollTo(0, 0);
+  }
+  window.addEventListener("beforeprint", function () { document.querySelectorAll("details").forEach(function (d) { d.open = true; }); });
+
+  // §§ BOOT
+  try { var th = localStorage.getItem("phil-map-theme"); if (th === "light" || th === "dark") document.documentElement.setAttribute("data-theme", th); } catch (e) {}
+  DATA = readBlock("philosophy-data");
+  PROPOSAL = readBlock("proposal-data");
+  if (DATA && !Array.isArray(DATA.tensions)) { LOAD_ERROR = "The embedded philosophy has no tensions list."; DATA.tensions = []; }
+  render();
+  if (location.hash) revealHash();
+})();
+</script>
+</body>
+</html>

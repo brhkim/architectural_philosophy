@@ -1,5 +1,5 @@
 {
-  "schema": "architectural-philosophy-proposal/0.1",
+  "schema": "philosophical-alignment-proposal/0.1",
   "title": "Optional compiled fast parser (rowfold[fast])",
   "summary": "Add an optional compiled parser, installed with \"pip install rowfold[fast]\", with the pure-Python parser as the fallback, and test both for identical output. (Example package.)",
   "bluf": "Add an optional compiled parser, installed with \"pip install rowfold[fast]\"; rowfold uses it when present and falls back to the pure-Python parser otherwise, and one shared test suite checks that both give identical output. This is the case the philosophy already welcomes, compiled code as an optional extra with an identical-results fallback, so plain installs and correctness are untouched. Decision needed: approve the optional [fast] extra?",
